@@ -13,10 +13,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.core.auth.AuthRepository
 import com.example.mypasswords.navigation.Routes
-import com.example.mypasswords.screens.Finger.FingerPrintAuthScreen
-import com.example.mypasswords.screens.Password.AddPasswordScreen
-import com.example.mypasswords.screens.Password.PasswordScreen
-import com.example.mypasswords.screens.Welcome.WelcomeScreen
+import com.example.mypasswords.screens.finger.FingerPrintAuthScreen
+import com.example.mypasswords.screens.password.AddPasswordScreen
+import com.example.mypasswords.screens.password.PasswordScreen
+import com.example.mypasswords.screens.welcome.WelcomeScreen
 import com.example.mypasswords.ui.theme.MyPasswordsTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject

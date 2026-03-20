@@ -1,4 +1,4 @@
-package com.example.mypasswords.screens.Finger
+package com.example.mypasswords.screens.finger
 
 import android.content.Context
 import android.content.ContextWrapper
@@ -39,14 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.compose_ui.components.CFloatingIcon
 import com.example.compose_ui.components.CText
 import com.example.mypasswords.R
-import com.example.mypasswords.theme.BackgroundColor
-import com.example.mypasswords.theme.CircleIconBackGroundColor
-import com.example.mypasswords.theme.CircleIconBorderColor
-import com.example.mypasswords.theme.CircleIconColor
-import com.example.mypasswords.theme.ShieldBlurColor
-import com.example.mypasswords.theme.SubTitleTextColor
-import com.example.mypasswords.theme.TitleTextColor
-import com.example.mypasswords.theme.ButtonColor
+import com.example.mypasswords.ui.theme.*
 
 @Composable
 fun FingerPrintAuthScreen(

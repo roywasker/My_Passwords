@@ -1,35 +1,67 @@
-package com.example.mypasswords.screens.Password
+package com.example.mypasswords.screens.password
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.PersonOutline
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.compose_ui.components.CCategoryItem
+import com.example.compose_ui.components.CCategoryList
 import com.example.compose_ui.components.CText
-import com.example.core.model.CategoryChip
 import com.example.mypasswords.R
-import com.example.mypasswords.theme.*
+import com.example.mypasswords.ui.theme.BackgroundColor
+import com.example.mypasswords.ui.theme.ButtonColor
+import com.example.mypasswords.ui.theme.RectangleBackGroundColor
+import com.example.mypasswords.ui.theme.RectangleIconBorderColor
+import com.example.mypasswords.ui.theme.SubTitleTextColor
+import com.example.mypasswords.ui.theme.TitleTextColor
 
 @Composable
 fun AddPasswordScreen(
@@ -66,10 +98,15 @@ fun AddPasswordScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                CategorySelectionList(
-                    categories = uiState.categories,
+                CCategoryList(
+                    categories = uiState.categories.map { chip -> CCategoryItem(chip.id, chip.name) },
                     selectedCategoryId = uiState.selectedCategoryId,
-                    onCategorySelected = viewModel::onCategorySelected
+                    onCategorySelected = viewModel::onCategorySelected,
+                    activeColor = ButtonColor,
+                    inactiveColor = RectangleBackGroundColor,
+                    activeTextColor = TitleTextColor,
+                    inactiveTextColor = SubTitleTextColor,
+                    borderColor = RectangleIconBorderColor
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -185,57 +222,6 @@ private fun AddPasswordTopBar(onBackClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun CategorySelectionList(
-    categories: List<CategoryChip>,
-    selectedCategoryId: Int,
-    onCategorySelected: (Int) -> Unit
-) {
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(categories) { category ->
-            val isSelected = category.id == selectedCategoryId
-            CategoryChipItem(
-                category = category,
-                isSelected = isSelected,
-                onClick = { onCategorySelected(category.id) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun CategoryChipItem(
-    category: CategoryChip,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val bgColor = if (isSelected) ButtonColor else RectangleBackGroundColor
-    val textColor = if (isSelected) TitleTextColor else SubTitleTextColor
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(bgColor)
-            .border(
-                width = 1.dp,
-                color = if (isSelected) Color.Transparent else RectangleIconBorderColor,
-                shape = RoundedCornerShape(20.dp)
-            )
-            .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        CText(
-            text = category.name,
-            color = textColor,
-            fontSize = 13.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-        )
-    }
-}
 
 @Composable
 private fun AddPasswordFieldLabel(label: String) {

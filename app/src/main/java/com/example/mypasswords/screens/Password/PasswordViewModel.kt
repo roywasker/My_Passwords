@@ -1,4 +1,4 @@
-package com.example.mypasswords.screens.Password
+package com.example.mypasswords.screens.password
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -64,11 +64,13 @@ class PasswordViewModel @Inject constructor(
     }
 
     private fun loadInitialData() {
-        val initialCategories = passwordRepository.getCategories(application)
-
+        val categories = passwordRepository.getCategories().map { category ->
+            CategoryChip(category.id, application.getString(category.nameResId))
+        }
+        
         _uiState.update { currentState ->
             currentState.copy(
-                categories = initialCategories,
+                categories = categories,
                 selectedCategoryId = 1
             )
         }

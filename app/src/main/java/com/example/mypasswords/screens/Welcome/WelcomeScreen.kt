@@ -1,10 +1,9 @@
-package com.example.mypasswords.screens.Welcome
+package com.example.mypasswords.screens.welcome
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,23 +12,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.VpnKey
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,7 +30,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,16 +42,16 @@ import com.example.compose_ui.components.CIconWithUnderText
 import com.example.compose_ui.components.CImageResource
 import com.example.compose_ui.components.CText
 import com.example.mypasswords.R
-import com.example.mypasswords.theme.BackgroundColor
-import com.example.mypasswords.theme.ButtonColor
-import com.example.mypasswords.theme.CircleIconBackGroundColor
-import com.example.mypasswords.theme.CircleIconBorderColor
-import com.example.mypasswords.theme.CircleIconColor
-import com.example.mypasswords.theme.RectangleBackGroundColor
-import com.example.mypasswords.theme.RectangleIconBorderColor
-import com.example.mypasswords.theme.ShieldBlurColor
-import com.example.mypasswords.theme.SubTitleTextColor
-import com.example.mypasswords.theme.TitleTextColor
+import com.example.mypasswords.ui.theme.BackgroundColor
+import com.example.mypasswords.ui.theme.ButtonColor
+import com.example.mypasswords.ui.theme.CircleIconBackGroundColor
+import com.example.mypasswords.ui.theme.CircleIconBorderColor
+import com.example.mypasswords.ui.theme.CircleIconColor
+import com.example.mypasswords.ui.theme.RectangleBackGroundColor
+import com.example.mypasswords.ui.theme.RectangleIconBorderColor
+import com.example.mypasswords.ui.theme.ShieldBlurColor
+import com.example.mypasswords.ui.theme.SubTitleTextColor
+import com.example.mypasswords.ui.theme.TitleTextColor
 
 @Composable
 fun WelcomeScreen(onClick: () -> Unit) {
@@ -153,7 +144,7 @@ fun WelcomeScreen(onClick: () -> Unit) {
                 textFontSize = 18.sp,
                 textFontWeight = FontWeight.Bold,
                 onClick = onClick,
-                icon = Icons.Filled.ArrowBack,
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
                 iconSize = 24.dp
             )
         }

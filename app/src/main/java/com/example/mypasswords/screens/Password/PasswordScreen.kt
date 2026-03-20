@@ -1,19 +1,47 @@
-package com.example.mypasswords.screens.Password
+package com.example.mypasswords.screens.password
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,14 +55,26 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
+import com.example.compose_ui.components.CCategoryItem
+import com.example.compose_ui.components.CCategoryList
 import com.example.compose_ui.components.CFloatingIcon
 import com.example.compose_ui.components.CText
 import com.example.core.model.PasswordItemModel
 import com.example.mypasswords.R
-import com.example.mypasswords.theme.*
+import com.example.mypasswords.ui.theme.BackgroundColor
+import com.example.mypasswords.ui.theme.ButtonColor
+import com.example.mypasswords.ui.theme.CircleIconBackGroundColor
+import com.example.mypasswords.ui.theme.CircleIconBorderColor
+import com.example.mypasswords.ui.theme.CircleIconColor
+import com.example.mypasswords.ui.theme.DeleteButtonBackgroundColor
+import com.example.mypasswords.ui.theme.DeleteButtonColor
+import com.example.mypasswords.ui.theme.RectangleBackGroundColor
+import com.example.mypasswords.ui.theme.RectangleIconBorderColor
+import com.example.mypasswords.ui.theme.SubTitleTextColor
+import com.example.mypasswords.ui.theme.TitleTextColor
 
 @Composable
 fun PasswordScreen(
@@ -69,10 +109,18 @@ fun PasswordScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // Categories
-            CategoryList(
-                categories = uiState.categories,
+            CCategoryList(
+                categories = uiState.categories.map { chip -> CCategoryItem(chip.id, chip.name) },
                 selectedCategoryId = uiState.selectedCategoryId,
-                onCategorySelected = viewModel::onCategorySelected
+                onCategorySelected = viewModel::onCategorySelected,
+                reverseLayout = true,
+                contentPadding = PaddingValues(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+                activeColor = ButtonColor,
+                inactiveColor = RectangleBackGroundColor,
+                activeTextColor = TitleTextColor,
+                inactiveTextColor = SubTitleTextColor,
+                borderColor = RectangleIconBorderColor
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -197,46 +245,6 @@ private fun PasswordTopBar(
     }
 }
 
-@Composable
-private fun CategoryList(
-    categories: List<com.example.core.model.CategoryChip>,
-    selectedCategoryId: Int,
-    onCategorySelected: (Int) -> Unit
-) {
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        reverseLayout = true,
-        contentPadding = PaddingValues(horizontal = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End)
-    ) {
-        items(categories, key = { it.id }) { category ->
-            val isSelected = category.id == selectedCategoryId
-            val bgColor = if (isSelected) ButtonColor else RectangleBackGroundColor
-            val textColor = if (isSelected) TitleTextColor else SubTitleTextColor
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(bgColor)
-                    .border(
-                        width = 1.dp,
-                        color = if (isSelected) Color.Transparent else RectangleIconBorderColor,
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .clickable { onCategorySelected(category.id) }
-                    .padding(horizontal = 20.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                CText(
-                    text = category.name,
-                    color = textColor,
-                    fontSize = 14.sp,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun PasswordList(
@@ -282,7 +290,7 @@ private fun BoxScope.AddPasswordFAB(onAddClick: () -> Unit) {
     FloatingActionButton(
         onClick = onAddClick,
         modifier = Modifier
-            .align(Alignment.BottomStart)
+            .align(AbsoluteAlignment.BottomLeft)
             .padding(start = 24.dp, bottom = 40.dp)
             .size(65.dp),
         containerColor = ButtonColor,

@@ -5,7 +5,7 @@ import android.content.SharedPreferences
 import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import com.example.core.crypo.CryptoManager
+import com.example.core.crypto.CryptoManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -15,16 +15,16 @@ import androidx.core.content.edit
 
 @Singleton
 class DatabaseManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val cryptoManager: CryptoManager
 ) {
     private var database: VaultDatabase? = null
     
     // Security: The DPK (Data Protection Key) stored in memory after biometric unwrap
     private var sessionVaultKey: ByteArray? = null
-    
+
     private val sharedPrefs: SharedPreferences by lazy {
-        val masterKey = MasterKey.Builder(context)
+        val masterKey = MasterKey.Builder(context, MasterKey.DEFAULT_MASTER_KEY_ALIAS)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
             
@@ -84,7 +84,6 @@ class DatabaseManager @Inject constructor(
             newPassphrase
         } else {
             // Subsequent times: Unwrap
-            val ivBase64 = sharedPrefs.getString(PASSPHRASE_IV_KEY, null)!!
             cryptoManager.unwrapKey(encryptedPassphraseBase64, authenticatedCipher)
         }
 
@@ -93,15 +92,5 @@ class DatabaseManager @Inject constructor(
         
         // Security: Clear the local reference to passphrase (Room now has its copy)
         passphrase.fill(0)
-    }
-
-    /**
-     * Security: Wipe keys from memory and close database.
-     */
-    fun lock() {
-        sessionVaultKey?.fill(0)
-        sessionVaultKey = null
-        database?.close()
-        database = null
     }
 }

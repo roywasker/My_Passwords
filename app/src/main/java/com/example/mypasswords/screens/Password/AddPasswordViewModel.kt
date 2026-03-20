@@ -1,4 +1,4 @@
-package com.example.mypasswords.screens.Password
+package com.example.mypasswords.screens.password
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -38,7 +38,9 @@ class AddPasswordViewModel @Inject constructor(
     }
 
     private fun loadCategories() {
-        val categories = passwordRepository.getCategories(application)
+        val categories = passwordRepository.getCategories().map { category ->
+            CategoryChip(category.id, application.getString(category.nameResId))
+        }
         _uiState.update { it.copy(categories = categories) }
     }
 
@@ -74,6 +76,7 @@ class AddPasswordViewModel @Inject constructor(
                     categoryId = state.selectedCategoryId
                 )
                 passwordRepository.addPassword(credential)
+                credential.clear() // Security: clear sensitive bytes from memory
                 _uiState.update { it.copy(isSaved = true) }
             }
         }

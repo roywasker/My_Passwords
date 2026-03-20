@@ -1,4 +1,4 @@
-package com.example.mypasswords.screens.Finger
+package com.example.mypasswords.screens.finger
 
 import android.app.Application
 import androidx.biometric.BiometricPrompt
