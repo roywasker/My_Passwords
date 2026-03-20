@@ -8,5 +8,5 @@ data class PasswordItemModel(
     val categoryId: Int = 1
 ) {
     val letter: String
-        get() = platform.trim().firstOrNull()?.uppercase()?.toString() ?: ""
+        get() = platform.trim().firstOrNull()?.uppercase() ?: ""
 }

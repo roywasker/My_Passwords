@@ -72,7 +72,7 @@ class AddPasswordViewModel @Inject constructor(
                     platformName = state.platformName,
                     username = state.username.toByteArray(),
                     password = state.password.toByteArray(),
-                    website = "", // Optional for now
+                    website = state.platformName.trim().lowercase()+".com",
                     categoryId = state.selectedCategoryId
                 )
                 passwordRepository.addPassword(credential)
