@@ -39,7 +39,8 @@ import com.example.mypasswords.theme.*
 @Composable
 fun PasswordScreen(
     viewModel: PasswordViewModel = hiltViewModel(),
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onAddClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val filteredPasswords by viewModel.filteredPasswords.collectAsStateWithLifecycle()
@@ -96,18 +97,7 @@ fun PasswordScreen(
         BottomBlurEffect()
 
         // FAB
-        AddPasswordFAB(
-            onAddClick = {
-                val newId = (filteredPasswords.maxOfOrNull { it.id } ?: 0) + 1
-                viewModel.onAddPassword(
-                    "New Platform $newId",
-                    "user$newId",
-                    "password$newId",
-                    "example.com",
-                    uiState.selectedCategoryId
-                )
-            }
-        )
+        AddPasswordFAB(onAddClick = onAddClick)
     }
 }
 

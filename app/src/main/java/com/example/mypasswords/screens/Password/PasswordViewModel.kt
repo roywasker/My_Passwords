@@ -5,9 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.data.PasswordRepository
 import com.example.core.model.CategoryChip
-import com.example.core.model.Credential
 import com.example.core.model.PasswordItemModel
-import com.example.mypasswords.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -66,12 +64,7 @@ class PasswordViewModel @Inject constructor(
     }
 
     private fun loadInitialData() {
-        val initialCategories = listOf(
-            CategoryChip(1, application.getString(R.string.category_all)),
-            CategoryChip(2, application.getString(R.string.category_work)),
-            CategoryChip(3, application.getString(R.string.category_personal)),
-            CategoryChip(4, application.getString(R.string.category_finance))
-        )
+        val initialCategories = passwordRepository.getCategories(application)
 
         _uiState.update { currentState ->
             currentState.copy(
@@ -83,19 +76,6 @@ class PasswordViewModel @Inject constructor(
 
     fun onCategorySelected(categoryId: Int) {
         _uiState.update { it.copy(selectedCategoryId = categoryId) }
-    }
-
-    fun onAddPassword(platform: String, user: String, pass: String, web: String, categoryId: Int) {
-        viewModelScope.launch {
-            val credential = Credential(
-                platformName = platform,
-                username = user.toByteArray(),
-                password = pass.toByteArray(),
-                website = web,
-                categoryId = categoryId
-            )
-            passwordRepository.addPassword(credential)
-        }
     }
 
     fun showDeleteConfirmation(item: PasswordItemModel) {

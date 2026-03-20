@@ -2,6 +2,9 @@ package com.example.core.data
 
 import com.example.core.crypo.CryptoManager
 import com.example.core.data.entity.EncryptedCredentialEntity
+import com.example.core.model.Category
+import com.example.core.model.CategoryChip
+import android.content.Context
 import com.example.core.model.Credential
 import com.example.core.model.PasswordItemModel
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +22,12 @@ class PasswordRepository @Inject constructor(
     private val databaseManager: DatabaseManager,
     private val cryptoManager: CryptoManager
 ) {
+    
+    fun getCategories(context: Context): List<CategoryChip> {
+        return Category.getAllCategories().map {
+            CategoryChip(it.id, context.getString(it.nameResId))
+        }
+    }
     
     @OptIn(ExperimentalCoroutinesApi::class)
     val passwords: Flow<List<PasswordItemModel>> = flowOf(databaseManager)

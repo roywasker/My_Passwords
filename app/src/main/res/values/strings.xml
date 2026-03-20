@@ -11,10 +11,6 @@
     <string name="fingerPrint_screen_subtitle">נא לאמת זהות באמצעות טביעת אצבע</string>
     <string name="fingerPrint_screen_third_title">גע בחיישן כדי לגשת לסיסמאות השמורות שלך</string>
     <string name="password_screen_title">הסיסמאות השמורות שלי</string>
-    <string name="category_all">הכל</string>
-    <string name="category_work">עבודה</string>
-    <string name="category_personal">אישי</string>
-    <string name="category_finance">פיננסים</string>
     <string name="add_password_btn">Add Password</string>
     <string name="delete_btn">Delete</string>
     <string name="edit_btn">Edit</string>
@@ -23,10 +19,21 @@
     <string name="login_title">Login</string>
     <string name="login_subtitle">Use your fingerprint to login</string>
     <string name="negative_button_text">Cancel</string>
-    <string name="search_placeholder">חיפוש...</string>
+    <string name="search_placeholder">חיפוש…</string>
     <string name="close_search_desc">סגור חיפוש</string>
     <string name="delete_dialog_title">מחיקת פריט‎?</string>
     <string name="delete_dialog_description">האם אתה בטוח שברצונך למחוק את פרטי ההתחברות של %s‎?</string>
     <string name="delete_dialog_confirm">מחק</string>
     <string name="delete_dialog_cancel">ביטול</string>
+    <string name="add_password_title">הוספת פרטי התחברות חדשים</string>
+    <string name="select_category_label">בחר קטגוריה</string>
+    <string name="platform_name_label">שם הפלטפורמה</string>
+    <string name="username_email_label">שם משתמש / אימייל</string>
+    <string name="password_label">סיסמה</string>
+    <string name="platform_name_placeholder">Google, Netflix…</string>
+    <string name="username_email_placeholder">eyam3le@mail.com</string>
+    <string name="generate_secure_password">צור סיסמה מאובטחת</string>
+    <string name="security_notice">פרטי ההתחברות שלך מוצפנים מקצה לקצה ויישמרו בכספת המאובטחת שלך.</string>
+    <string name="save_now_btn">שמור כעת</string>
+    <string name="cancel_btn">ביטול</string>
 </resources>

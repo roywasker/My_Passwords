@@ -5,15 +5,16 @@ import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.core.auth.AuthRepository
 import com.example.mypasswords.navigation.Routes
 import com.example.mypasswords.screens.Finger.FingerPrintAuthScreen
+import com.example.mypasswords.screens.Password.AddPasswordScreen
 import com.example.mypasswords.screens.Password.PasswordScreen
 import com.example.mypasswords.screens.Welcome.WelcomeScreen
 import com.example.mypasswords.ui.theme.MyPasswordsTheme
@@ -80,6 +81,9 @@ class MainActivity : AppCompatActivity() {
                                         popUpTo(0) { inclusive = true }
                                         launchSingleTop = true
                                     }
+                                },
+                                onAddClick = {
+                                    navController.navigate(Routes.ADD_PASSWORD)
                                 }
                             )
                         } else {
@@ -90,6 +94,16 @@ class MainActivity : AppCompatActivity() {
                                     popUpTo(0) { inclusive = true }
                                 }
                             }
+                        }
+                    }
+
+                    composable(Routes.ADD_PASSWORD) {
+                        if (isAuthenticated) {
+                            AddPasswordScreen(
+                                onBackClick = {
+                                    navController.popBackStack()
+                                }
+                            )
                         }
                     }
                 }
