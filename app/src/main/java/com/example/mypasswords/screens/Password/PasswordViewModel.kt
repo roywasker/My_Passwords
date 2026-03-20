@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.data.PasswordRepository
 import com.example.core.model.CategoryChip
+import com.example.core.model.Credential
 import com.example.core.model.PasswordItemModel
 import com.example.mypasswords.R
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 // UI State
@@ -22,7 +24,8 @@ data class PasswordUiState(
     val categories: List<CategoryChip> = emptyList(),
     val selectedCategoryId: Int = 1,
     val isSearchActive: Boolean = false,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val itemToDelete: PasswordItemModel? = null
 )
 
 @HiltViewModel
@@ -34,17 +37,22 @@ class PasswordViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(PasswordUiState())
     val uiState: StateFlow<PasswordUiState> = _uiState.asStateFlow()
 
-    // Derived state for filtered passwords based on search query
+    // Derived state for filtered passwords based on search query and category
     val filteredPasswords: StateFlow<List<PasswordItemModel>> = combine(
         passwordRepository.passwords,
         _uiState
     ) { passwords, state ->
-        if (state.searchQuery.isBlank()) {
+        val categoryFiltered = if (state.selectedCategoryId == 1) {
             passwords
         } else {
-            passwords.filter {
-                it.platform.contains(state.searchQuery, ignoreCase = true) ||
-                it.userName.contains(state.searchQuery, ignoreCase = true)
+            passwords.filter { it.categoryId == state.selectedCategoryId }
+        }
+
+        if (state.searchQuery.isBlank()) {
+            categoryFiltered
+        } else {
+            categoryFiltered.filter {
+                it.platform.contains(state.searchQuery, ignoreCase = true)
             }
         }
     }.stateIn(
@@ -77,12 +85,33 @@ class PasswordViewModel @Inject constructor(
         _uiState.update { it.copy(selectedCategoryId = categoryId) }
     }
 
-    fun onAddPassword(item: PasswordItemModel) {
-        passwordRepository.addPassword(item)
+    fun onAddPassword(platform: String, user: String, pass: String, web: String, categoryId: Int) {
+        viewModelScope.launch {
+            val credential = Credential(
+                platformName = platform,
+                username = user.toByteArray(),
+                password = pass.toByteArray(),
+                website = web,
+                categoryId = categoryId
+            )
+            passwordRepository.addPassword(credential)
+        }
     }
 
-    fun onDeletePassword(passwordId: Int) {
-        passwordRepository.deletePassword(passwordId)
+    fun showDeleteConfirmation(item: PasswordItemModel) {
+        _uiState.update { it.copy(itemToDelete = item) }
+    }
+
+    fun dismissDeleteConfirmation() {
+        _uiState.update { it.copy(itemToDelete = null) }
+    }
+
+    fun confirmDelete() {
+        val item = _uiState.value.itemToDelete ?: return
+        viewModelScope.launch {
+            passwordRepository.deletePassword(item.id)
+            dismissDeleteConfirmation()
+        }
     }
 
     fun onToggleSearch() {

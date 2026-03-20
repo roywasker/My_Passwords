@@ -42,6 +42,12 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     implementation(libs.androidx.biometric)
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+    implementation(libs.sqlcipher)
+    implementation(libs.sqlite.ktx)
 }

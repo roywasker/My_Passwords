@@ -25,4 +25,8 @@
     <string name="negative_button_text">Cancel</string>
     <string name="search_placeholder">חיפוש...</string>
     <string name="close_search_desc">סגור חיפוש</string>
+    <string name="delete_dialog_title">מחיקת פריט‎?</string>
+    <string name="delete_dialog_description">האם אתה בטוח שברצונך למחוק את פרטי ההתחברות של %s‎?</string>
+    <string name="delete_dialog_confirm">מחק</string>
+    <string name="delete_dialog_cancel">ביטול</string>
 </resources>

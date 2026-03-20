@@ -7,7 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.core.auth.AuthRepository
 import com.example.core.auth.BiometricAuthManager
-import com.example.core.crypo.CryptoManager
+import com.example.core.data.DatabaseManager
 import com.example.mypasswords.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,14 +18,13 @@ import javax.inject.Inject
 
 sealed class AuthState {
     object Idle : AuthState()
-    data class ReadyToPrompt(val cryptoObject: BiometricPrompt.CryptoObject) : AuthState()
     object Success : AuthState()
     data class Error(val message: String) : AuthState()
 }
 
 @HiltViewModel
 class FingerPrintViewModel @Inject constructor(
-    private val cryptoManager: CryptoManager,
+    private val databaseManager: DatabaseManager,
     private val authRepository: AuthRepository,
     private val biometricAuthManager: BiometricAuthManager,
     private val application: Application
@@ -37,10 +36,8 @@ class FingerPrintViewModel @Inject constructor(
     fun prepareAuthentication(activity: FragmentActivity) {
         viewModelScope.launch {
             try {
-                // In a real app, the IV should be stored securely after initial encryption
-                val dummyIv = byteArrayOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
-                val lockedCipher = cryptoManager.getInitializedCipherForDecryption(dummyIv)
-                val cryptoObject = BiometricPrompt.CryptoObject(lockedCipher)
+                val cipher = databaseManager.getPassphraseCipher()
+                val cryptoObject = BiometricPrompt.CryptoObject(cipher)
 
                 biometricAuthManager.promptBiometricAuth(
                     activity = activity,
@@ -50,7 +47,7 @@ class FingerPrintViewModel @Inject constructor(
                     cryptoObject = cryptoObject,
                     onSuccess = { result -> onAuthenticationSucceeded(result) },
                     onError = { error -> onAuthenticationError(error) },
-                    onFailed = { /* Handle failure if needed */ }
+                    onFailed = { /* Handle failure */ }
                 )
             } catch (e: Exception) {
                 _authState.value = AuthState.Error(application.getString(R.string.fingerprint_auth_error_security))
@@ -59,10 +56,17 @@ class FingerPrintViewModel @Inject constructor(
     }
 
     private fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-        val unlockedCipher = result.cryptoObject?.cipher
-        if (unlockedCipher != null) {
-            authRepository.setAuthenticated(true)
-            _authState.value = AuthState.Success
+        val cipher = result.cryptoObject?.cipher
+        if (cipher != null) {
+            viewModelScope.launch {
+                try {
+                    databaseManager.initializeDatabase(cipher)
+                    authRepository.setAuthenticated(true)
+                    _authState.value = AuthState.Success
+                } catch (e: Exception) {
+                    _authState.value = AuthState.Error("Failed to initialize vault database")
+                }
+            }
         } else {
             _authState.value = AuthState.Error(application.getString(R.string.fingerprint_auth_error_cipher_not_released))
         }

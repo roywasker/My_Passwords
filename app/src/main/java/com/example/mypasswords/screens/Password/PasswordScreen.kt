@@ -79,7 +79,16 @@ fun PasswordScreen(
             // Passwords List
             PasswordList(
                 passwords = filteredPasswords,
-                onDeletePassword = viewModel::onDeletePassword
+                onDeletePassword = viewModel::showDeleteConfirmation
+            )
+        }
+
+        // Delete Confirmation Dialog
+        uiState.itemToDelete?.let { item ->
+            DeleteConfirmationDialog(
+                platformName = item.platform,
+                onConfirm = viewModel::confirmDelete,
+                onDismiss = viewModel::dismissDeleteConfirmation
             )
         }
 
@@ -91,12 +100,11 @@ fun PasswordScreen(
             onAddClick = {
                 val newId = (filteredPasswords.maxOfOrNull { it.id } ?: 0) + 1
                 viewModel.onAddPassword(
-                    PasswordItemModel(
-                        id = newId,
-                        platform = "New Password $newId",
-                        userName = "user$newId@email.com",
-                        letter = "N"
-                    )
+                    "New Platform $newId",
+                    "user$newId",
+                    "password$newId",
+                    "example.com",
+                    uiState.selectedCategoryId
                 )
             }
         )
@@ -243,7 +251,7 @@ private fun CategoryList(
 @Composable
 private fun PasswordList(
     passwords: List<PasswordItemModel>,
-    onDeletePassword: (Int) -> Unit
+    onDeletePassword: (PasswordItemModel) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -254,7 +262,7 @@ private fun PasswordList(
             PasswordCard(
                 item = item,
                 onEditClick = { /* Handle edit */ },
-                onDeleteClick = { onDeletePassword(item.id) }
+                onDeleteClick = { onDeletePassword(item) }
             )
         }
     }
@@ -324,7 +332,7 @@ fun PasswordCard(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .background(DeleteButtonBackgroundColor)
+                .background(DeleteButtonBackgroundColor),
         ) {
             Icon(
                 imageVector = Icons.Default.DeleteOutline,
@@ -382,6 +390,8 @@ fun PasswordCard(
         }
 
         // Platform Icon
+        var isImageError by remember { mutableStateOf(false) }
+
         Box(
             modifier = Modifier
                 .size(50.dp)
@@ -394,13 +404,14 @@ fun PasswordCard(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            if (item.website.isNotBlank()) {
+            if (item.website.isNotBlank() && !isImageError) {
                 AsyncImage(
                     model = "https://www.google.com/s2/favicons?domain=${item.website}&sz=128",
                     contentDescription = item.platform,
                     modifier = Modifier
                         .size(32.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(RoundedCornerShape(4.dp)),
+                    onError = { isImageError = true }
                 )
             } else {
                 CText(

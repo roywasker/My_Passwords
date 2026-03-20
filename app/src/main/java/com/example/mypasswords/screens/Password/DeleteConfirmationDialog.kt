@@ -1,0 +1,152 @@
+package com.example.mypasswords.screens.Password
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.res.stringResource
+import com.example.mypasswords.R
+import com.example.compose_ui.components.CText
+import com.example.mypasswords.theme.*
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.ParagraphStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
+
+@Composable
+fun DeleteConfirmationDialog(
+    platformName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = BackgroundColor,
+            border = androidx.compose.foundation.BorderStroke(1.dp, RectangleIconBorderColor)
+        ) {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Trash Icon
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .background(DeleteButtonBackgroundColor),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = null,
+                            tint = DeleteButtonColor,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Title
+                    CText(
+                        text = stringResource(id = R.string.delete_dialog_title),
+                        color = TitleTextColor,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Description
+                    val descTemplate = stringResource(id = R.string.delete_dialog_description)
+                    val parts = descTemplate.split("%s")
+                    val descriptionText = buildAnnotatedString {
+                        withStyle(style = ParagraphStyle(textDirection = TextDirection.Rtl)) {
+                            if (parts.isNotEmpty()) append(parts[0])
+                            withStyle(style = SpanStyle(color = TitleTextColor, fontWeight = FontWeight.Bold)) {
+                                append(platformName)
+                            }
+                            if (parts.size > 1) append(parts[1])
+                        }
+                    }
+
+                    CText(
+                        text = descriptionText,
+                        color = SubTitleTextColor,
+                        fontSize = 16.sp,
+                        lineHeight = 24.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Delete Button
+                    Button(
+                        onClick = onConfirm,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = DeleteButtonColor
+                        )
+                    ) {
+                        CText(
+                            text = stringResource(id = R.string.delete_dialog_confirm),
+                            color = TitleTextColor,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Cancel Button
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RectangleBackGroundColor
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, RectangleIconBorderColor)
+                    ) {
+                        CText(
+                            text = stringResource(id = R.string.delete_dialog_cancel),
+                            color = TitleTextColor,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

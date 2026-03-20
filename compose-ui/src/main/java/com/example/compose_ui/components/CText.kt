@@ -11,10 +11,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.AnnotatedString
 
 @Composable
 fun CText(
-    text: String,
+    text: AnnotatedString,
     modifier: Modifier = Modifier,
     color: Color = Color.White,
     fontWeight: FontWeight = FontWeight.Normal,
@@ -34,6 +35,31 @@ fun CText(
         maxLines = maxLines,
         overflow = overflow,
         modifier = modifier
+    )
+}
+
+@Composable
+fun CText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.White,
+    fontWeight: FontWeight = FontWeight.Normal,
+    fontSize: TextUnit = 30.sp,
+    lineHeight: TextUnit = 30.sp,
+    textAlign: TextAlign = TextAlign.Center,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip
+) {
+    CText(
+        text = AnnotatedString(text),
+        modifier = modifier,
+        color = color,
+        fontWeight = fontWeight,
+        fontSize = fontSize,
+        lineHeight = lineHeight,
+        textAlign = textAlign,
+        maxLines = maxLines,
+        overflow = overflow
     )
 }
 

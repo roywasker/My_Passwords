@@ -20,7 +20,9 @@ hilt = "2.59.2"
 securityCrypto = "1.1.0"
 runtime = "1.10.5"
 material3 = "1.4.0"
-coil = "3.1.0"
+coil = "3.4.0"
+sqlcipher = "4.6.1"
+sqlite = "2.6.2"
 
 [libraries]
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
@@ -54,6 +56,8 @@ androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose-android", version.ref = "coil" }
 coil-network = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
+sqlcipher = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipher" }
+sqlite-ktx = { group = "androidx.sqlite", name = "sqlite-ktx", version.ref = "sqlite" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
