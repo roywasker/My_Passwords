@@ -376,7 +376,7 @@ fun PasswordCard(
                 modifier = Modifier.fillMaxWidth()
             )
             CText(
-                text = item.userName,
+                text = item.maskedUserName,
                 color = SubTitleTextColor,
                 fontSize = 13.sp,
                 lineHeight = 28.sp,
@@ -404,7 +404,7 @@ fun PasswordCard(
         ) {
             if (item.website.isNotBlank() && !isImageError) {
                 AsyncImage(
-                    model = "https://www.google.com/s2/favicons?domain=${item.website}&sz=128",
+                    model = item.website,
                     contentDescription = item.platform,
                     modifier = Modifier
                         .size(32.dp)

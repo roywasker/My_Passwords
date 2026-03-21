@@ -67,12 +67,13 @@ class AddPasswordViewModel @Inject constructor(
     fun onSaveClick() {
         val state = _uiState.value
         if (state.isSaveEnabled) {
-            viewModelScope.launch {
+            viewModelScope.launch{
+                val icon = state.platformName.trim().lowercase()+".com"
                 val credential = Credential(
                     platformName = state.platformName,
                     username = state.username.toByteArray(),
                     password = state.password.toByteArray(),
-                    website = state.platformName.trim().lowercase()+".com",
+                    website = "https://www.google.com/s2/favicons?domain=${icon}&sz=128",
                     categoryId = state.selectedCategoryId
                 )
                 passwordRepository.addPassword(credential)
