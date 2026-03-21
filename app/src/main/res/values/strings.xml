@@ -15,7 +15,9 @@
     <string name="delete_btn">Delete</string>
     <string name="edit_btn">Edit</string>
     <string name="fingerprint_auth_error_security">שגיאת אבטחה: לא ניתן לאתחל את ההצפנה.</string>
+    <string name="fingerprint_auth_error_key_invalidated">מפתחות האבטחה שונו (למשל עקב רישום טביעת אצבע חדשה). למען ביטחונך, יש לאפס את האפליקציה.</string>
     <string name="fingerprint_auth_error_cipher_not_released">שגיאה: מפתח ההצפנה לא שוחרר כראוי.</string>
+    <string name="fingerprint_auth_error_vault_init">כשל באתחול מסד הנתונים של הכספת.</string>
     <string name="login_title">Login</string>
     <string name="login_subtitle">Use your fingerprint to login</string>
     <string name="negative_button_text">Cancel</string>

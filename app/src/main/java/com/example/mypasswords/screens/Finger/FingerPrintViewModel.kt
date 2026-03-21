@@ -16,10 +16,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import android.security.keystore.KeyPermanentlyInvalidatedException
+
 sealed class AuthState {
     object Idle : AuthState()
     object Success : AuthState()
-    data class Error(val message: String) : AuthState()
+    data class Error(val message: String, val isFatal: Boolean = false) : AuthState()
 }
 
 @HiltViewModel
@@ -49,6 +51,11 @@ class FingerPrintViewModel @Inject constructor(
                     onError = { error -> onAuthenticationError(error) },
                     onFailed = { /* Handle failure */ }
                 )
+            } catch (e: KeyPermanentlyInvalidatedException) {
+                _authState.value = AuthState.Error(
+                    application.getString(R.string.fingerprint_auth_error_key_invalidated),
+                    isFatal = true
+                )
             } catch (e: Exception) {
                 _authState.value = AuthState.Error(application.getString(R.string.fingerprint_auth_error_security))
             }
@@ -64,7 +71,7 @@ class FingerPrintViewModel @Inject constructor(
                     authRepository.setAuthenticated(true)
                     _authState.value = AuthState.Success
                 } catch (e: Exception) {
-                    _authState.value = AuthState.Error("Failed to initialize vault database")
+                    _authState.value = AuthState.Error(application.getString(R.string.fingerprint_auth_error_vault_init))
                 }
             }
         } else {

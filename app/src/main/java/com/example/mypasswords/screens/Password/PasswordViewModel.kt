@@ -116,6 +116,7 @@ class PasswordViewModel @Inject constructor(
     }
 
     fun dismissPasswordDetail() {
+        _uiState.value.selectedItemDetail?.clear()
         _uiState.update { it.copy(selectedItemDetail = null) }
     }
 }

@@ -84,12 +84,12 @@ class PasswordRepository @Inject constructor(
         
         // Decrypt username
         val usernameBytes = cryptoManager.decryptWithKey(entity.encryptedUsername, entity.usernameIv, sessionKey)
-        val username = String(usernameBytes)
+        val username = String(usernameBytes).toCharArray()
         usernameBytes.fill(0)
         
         // Decrypt password
         val passwordBytes = cryptoManager.decryptWithKey(entity.encryptedPassword, entity.passwordIv, sessionKey)
-        val password = String(passwordBytes)
+        val password = String(passwordBytes).toCharArray()
         passwordBytes.fill(0)
         
         com.example.core.model.FullCredentialModel(

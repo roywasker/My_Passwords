@@ -66,8 +66,10 @@ fun FingerPrintAuthScreen(
             }
             is AuthState.Error -> {
                 Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
-                onCancelClick()
-                viewModel.resetState()
+                if (!state.isFatal) {
+                    onCancelClick()
+                    viewModel.resetState()
+                }
             }
             else -> {}
         }

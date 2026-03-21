@@ -1,5 +1,13 @@
 package com.example.compose_ui.components
 
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
+import android.content.Context
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.PersistableBundle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -34,9 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
@@ -44,14 +52,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 
-import androidx.compose.material3.rememberModalBottomSheetState
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CPasswordDetailSheet(
     platformName: String,
-    username: String,
-    password: String,
+    username: CharArray,
+    password: CharArray,
     website: String,
     onDismiss: () -> Unit,
     titleTextColor: Color = Color.White,
@@ -67,8 +73,35 @@ fun CPasswordDetailSheet(
 ) {
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isImageError by remember { mutableStateOf(false) }
-    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    fun copyToClipboard(label: String, text: String, isSensitive: Boolean) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText(label, text)
+        
+        if (isSensitive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val extras = PersistableBundle().apply {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+                } else {
+                    putBoolean("android.content.extra.IS_SENSITIVE", true)
+                }
+            }
+            clip.description.extras = extras
+        }
+        
+        clipboard.setPrimaryClip(clip)
+        
+        // Auto-clear clipboard after 60 seconds for security
+        if (isSensitive) {
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (clipboard.primaryClip?.description?.label == label) {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                }
+            }, 60000)
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -145,12 +178,12 @@ fun CPasswordDetailSheet(
                 // Username Field
                 DetailFieldGroup(
                     label = usernameLabel,
-                    value = username,
+                    value = String(username),
                     labelColor = subTitleTextColor,
                     valueColor = titleTextColor,
                     backgroundColor = fieldBackgroundColor,
                     borderColor = fieldBorderColor,
-                    onCopy = { clipboardManager.setText(AnnotatedString(username)) }
+                    onCopy = { copyToClipboard(usernameLabel, String(username), false) }
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -158,12 +191,12 @@ fun CPasswordDetailSheet(
                 // Password Field
                 DetailFieldGroup(
                     label = passwordLabel,
-                    value = if (isPasswordVisible) password else "•".repeat(12),
+                    value = if (isPasswordVisible) String(password) else "•".repeat(12),
                     labelColor = subTitleTextColor,
                     valueColor = titleTextColor,
                     backgroundColor = fieldBackgroundColor,
                     borderColor = fieldBorderColor,
-                    onCopy = { clipboardManager.setText(AnnotatedString(password)) },
+                    onCopy = { copyToClipboard(passwordLabel, String(password), true) },
                     trailingIcon = {
                         Icon(
                             imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
