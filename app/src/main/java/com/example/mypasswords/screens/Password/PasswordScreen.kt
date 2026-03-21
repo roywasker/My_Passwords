@@ -376,12 +376,13 @@ fun PasswordCard(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Delete Icon
-        IconButton(
-            onClick = onDeleteClick,
+        Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(38.dp)
                 .clip(CircleShape)
-                .background(DeleteButtonBackgroundColor),
+                .background(DeleteButtonBackgroundColor)
+                .clickable { onDeleteClick() },
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Default.DeleteOutline,
@@ -394,12 +395,13 @@ fun PasswordCard(
         Spacer(modifier = Modifier.width(12.dp))
 
         // Edit Icon
-        IconButton(
-            onClick = onEditClick,
+        Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(38.dp)
                 .clip(CircleShape)
                 .background(CircleIconBackGroundColor)
+                .clickable { onEditClick() },
+            contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.Default.Edit,
