@@ -102,6 +102,29 @@ class PasswordRepository @Inject constructor(
         )
     }
 
+    suspend fun updatePassword(id: Int, credential: Credential) = withContext(Dispatchers.IO) {
+        val sessionKey = databaseManager.getSessionVaultKey()
+        
+        val (encryptedUsername, usernameIv) = cryptoManager.encryptWithKey(credential.username, sessionKey)
+        val (encryptedPassword, passwordIv) = cryptoManager.encryptWithKey(credential.password, sessionKey)
+
+        val entity = EncryptedCredentialEntity(
+            id = id,
+            platformName = credential.platformName,
+            encryptedUsername = encryptedUsername,
+            usernameIv = usernameIv,
+            encryptedPassword = encryptedPassword,
+            passwordIv = passwordIv,
+            website = credential.website,
+            categoryId = credential.categoryId
+        )
+
+        databaseManager.getDatabase().credentialDao().insertCredential(entity)
+        
+        // Security: clear sensitive data
+        credential.clear()
+    }
+
     suspend fun deletePassword(id: Int) = withContext(Dispatchers.IO) {
         databaseManager.getDatabase().credentialDao().deleteCredential(id)
     }

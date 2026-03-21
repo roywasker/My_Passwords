@@ -61,6 +61,7 @@ import coil3.compose.AsyncImage
 import com.example.compose_ui.components.CCategoryItem
 import com.example.compose_ui.components.CCategoryList
 import com.example.compose_ui.components.CPasswordDetailSheet
+import com.example.compose_ui.components.CEditPasswordSheet
 import com.example.compose_ui.components.CFloatingIcon
 import com.example.compose_ui.components.CText
 import com.example.core.model.PasswordItemModel
@@ -130,8 +131,30 @@ fun PasswordScreen(
             PasswordList(
                 passwords = filteredPasswords,
                 onDeletePassword = viewModel::showDeleteConfirmation,
-                onPasswordClick = viewModel::onPasswordClick
+                onPasswordClick = viewModel::onPasswordClick,
+                onEditPassword = viewModel::onEditClick
             )
+            // Edit Password Bottom Sheet
+            uiState.itemToEdit?.let { detail ->
+                CEditPasswordSheet(
+                    platformName = detail.platform,
+                    initialUsername = String(detail.username),
+                    initialPassword = String(detail.password),
+                    website = detail.website,
+                    onDismiss = viewModel::dismissEdit,
+                    onUpdate = viewModel::updateCredential,
+                    titleTextColor = TitleTextColor,
+                    subTitleTextColor = SubTitleTextColor,
+                    buttonColor = ButtonColor,
+                    backgroundColor = BackgroundColor,
+                    fieldBackgroundColor = RectangleBackGroundColor,
+                    fieldBorderColor = RectangleIconBorderColor,
+                    title = stringResource(id = R.string.update_password),
+                    usernameLabel = stringResource(id = R.string.username_label),
+                    passwordLabel = stringResource(id = R.string.password_label),
+                    updateButtonText = stringResource(id = R.string.edit)
+                )
+            }
         }
 
         // Password Detail Bottom Sheet
@@ -273,7 +296,8 @@ private fun PasswordTopBar(
 private fun PasswordList(
     passwords: List<PasswordItemModel>,
     onDeletePassword: (PasswordItemModel) -> Unit,
-    onPasswordClick: (PasswordItemModel) -> Unit
+    onPasswordClick: (PasswordItemModel) -> Unit,
+    onEditPassword: (PasswordItemModel) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -283,7 +307,7 @@ private fun PasswordList(
         items(passwords, key = { it.id }) { item ->
             PasswordCard(
                 item = item,
-                onEditClick = { /* Handle edit */ },
+                onEditClick = { onEditPassword(item) },
                 onDeleteClick = { onDeletePassword(item) },
                 onPasswordClick = { onPasswordClick(item) }
             )

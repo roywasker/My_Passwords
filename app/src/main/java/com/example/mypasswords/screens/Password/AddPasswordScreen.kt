@@ -127,7 +127,7 @@ fun AddPasswordScreen(
                 AddPasswordFieldLabel(stringResource(id = R.string.username_email_label))
                 Spacer(modifier = Modifier.height(8.dp))
                 AddPasswordTextField(
-                    value = uiState.username,
+                    value = String(uiState.username),
                     onValueChange = viewModel::onUsernameChanged,
                     placeholder = stringResource(id = R.string.username_email_placeholder),
                     leadingIcon = Icons.Default.PersonOutline
@@ -140,7 +140,7 @@ fun AddPasswordScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 var isPasswordVisible by remember { mutableStateOf(false) }
                 AddPasswordTextField(
-                    value = uiState.password,
+                    value = String(uiState.password),
                     onValueChange = viewModel::onPasswordChanged,
                     placeholder = "••••••••••••",
                     leadingIcon = Icons.Default.LockOpen,

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.data.PasswordRepository
 import com.example.core.model.CategoryChip
 import com.example.core.model.PasswordItemModel
+import com.example.core.model.Credential
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,7 +25,8 @@ data class PasswordUiState(
     val isSearchActive: Boolean = false,
     val searchQuery: String = "",
     val itemToDelete: PasswordItemModel? = null,
-    val selectedItemDetail: com.example.core.model.FullCredentialModel? = null
+    val selectedItemDetail: com.example.core.model.FullCredentialModel? = null,
+    val itemToEdit: com.example.core.model.FullCredentialModel? = null
 )
 
 @HiltViewModel
@@ -118,5 +120,32 @@ class PasswordViewModel @Inject constructor(
     fun dismissPasswordDetail() {
         _uiState.value.selectedItemDetail?.clear()
         _uiState.update { it.copy(selectedItemDetail = null) }
+    }
+
+    fun onEditClick(item: PasswordItemModel) {
+        viewModelScope.launch {
+            val detail = passwordRepository.getDecryptedCredential(item.id)
+            _uiState.update { it.copy(itemToEdit = detail) }
+        }
+    }
+
+    fun dismissEdit() {
+        _uiState.value.itemToEdit?.clear()
+        _uiState.update { it.copy(itemToEdit = null) }
+    }
+
+    fun updateCredential(username: String, password: String) {
+        val currentEdit = _uiState.value.itemToEdit ?: return
+        viewModelScope.launch {
+            val updatedCredential = Credential(
+                platformName = currentEdit.platform,
+                username = username.toByteArray(),
+                password = password.toByteArray(),
+                website = currentEdit.website,
+                categoryId = currentEdit.categoryId
+            )
+            passwordRepository.updatePassword(currentEdit.id, updatedCredential)
+            dismissEdit()
+        }
     }
 }

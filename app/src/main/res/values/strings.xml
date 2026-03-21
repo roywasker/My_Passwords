@@ -41,4 +41,6 @@
     <string name="username_label">שם משתמש</string>
     <string name="close_btn">סגור</string>
     <string name="login_details_subtitle">פרטי התחברות</string>
+    <string name="edit">עדכן</string>
+    <string name="update_password">עדכון פרטי התחברות</string>
 </resources>
