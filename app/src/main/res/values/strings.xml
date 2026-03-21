@@ -36,4 +36,7 @@
     <string name="security_notice">פרטי ההתחברות שלך מוצפנים מקצה לקצה ויישמרו בכספת המאובטחת שלך.</string>
     <string name="save_now_btn">שמור כעת</string>
     <string name="cancel_btn">ביטול</string>
+    <string name="username_label">שם משתמש</string>
+    <string name="close_btn">סגור</string>
+    <string name="login_details_subtitle">פרטי התחברות</string>
 </resources>

@@ -12,6 +12,9 @@ interface CredentialDao {
     @Query("SELECT * FROM credentials")
     fun getAllCredentials(): Flow<List<EncryptedCredentialEntity>>
 
+    @Query("SELECT * FROM credentials WHERE id = :id")
+    suspend fun getCredentialById(id: Int): EncryptedCredentialEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCredential(credential: EncryptedCredentialEntity)
 

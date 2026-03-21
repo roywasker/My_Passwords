@@ -60,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.example.compose_ui.components.CCategoryItem
 import com.example.compose_ui.components.CCategoryList
+import com.example.compose_ui.components.CPasswordDetailSheet
 import com.example.compose_ui.components.CFloatingIcon
 import com.example.compose_ui.components.CText
 import com.example.core.model.PasswordItemModel
@@ -128,7 +129,29 @@ fun PasswordScreen(
             // Passwords List
             PasswordList(
                 passwords = filteredPasswords,
-                onDeletePassword = viewModel::showDeleteConfirmation
+                onDeletePassword = viewModel::showDeleteConfirmation,
+                onPasswordClick = viewModel::onPasswordClick
+            )
+        }
+
+        // Password Detail Bottom Sheet
+        uiState.selectedItemDetail?.let { detail ->
+            CPasswordDetailSheet(
+                platformName = detail.platform,
+                username = detail.username,
+                password = detail.password,
+                website = detail.website,
+                onDismiss = viewModel::dismissPasswordDetail,
+                titleTextColor = TitleTextColor,
+                subTitleTextColor = SubTitleTextColor,
+                buttonColor = ButtonColor,
+                backgroundColor = BackgroundColor,
+                fieldBackgroundColor = RectangleBackGroundColor,
+                fieldBorderColor = RectangleIconBorderColor,
+                closeButtonText = stringResource(id = R.string.close_btn),
+                usernameLabel = stringResource(id = R.string.username_label),
+                passwordLabel = stringResource(id = R.string.password_label),
+                loginDetailsSubtitle = stringResource(id = R.string.login_details_subtitle)
             )
         }
 
@@ -249,7 +272,8 @@ private fun PasswordTopBar(
 @Composable
 private fun PasswordList(
     passwords: List<PasswordItemModel>,
-    onDeletePassword: (PasswordItemModel) -> Unit
+    onDeletePassword: (PasswordItemModel) -> Unit,
+    onPasswordClick: (PasswordItemModel) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
@@ -260,7 +284,8 @@ private fun PasswordList(
             PasswordCard(
                 item = item,
                 onEditClick = { /* Handle edit */ },
-                onDeleteClick = { onDeletePassword(item) }
+                onDeleteClick = { onDeletePassword(item) },
+                onPasswordClick = { onPasswordClick(item) }
             )
         }
     }
@@ -309,7 +334,8 @@ private fun BoxScope.AddPasswordFAB(onAddClick: () -> Unit) {
 fun PasswordCard(
     item: PasswordItemModel,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onPasswordClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -321,6 +347,7 @@ fun PasswordCard(
                 color = RectangleIconBorderColor,
                 shape = RoundedCornerShape(16.dp)
             )
+            .clickable { onPasswordClick() }
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

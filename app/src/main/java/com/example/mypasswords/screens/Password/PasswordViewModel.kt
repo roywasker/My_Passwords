@@ -23,7 +23,8 @@ data class PasswordUiState(
     val selectedCategoryId: Int = 1,
     val isSearchActive: Boolean = false,
     val searchQuery: String = "",
-    val itemToDelete: PasswordItemModel? = null
+    val itemToDelete: PasswordItemModel? = null,
+    val selectedItemDetail: com.example.core.model.FullCredentialModel? = null
 )
 
 @HiltViewModel
@@ -105,5 +106,16 @@ class PasswordViewModel @Inject constructor(
 
     fun onSearchQueryChanged(query: String) {
         _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun onPasswordClick(item: PasswordItemModel) {
+        viewModelScope.launch {
+            val detail = passwordRepository.getDecryptedCredential(item.id)
+            _uiState.update { it.copy(selectedItemDetail = detail) }
+        }
+    }
+
+    fun dismissPasswordDetail() {
+        _uiState.update { it.copy(selectedItemDetail = null) }
     }
 }

@@ -76,6 +76,32 @@ class PasswordRepository @Inject constructor(
         credential.clear()
     }
 
+    suspend fun getDecryptedCredential(id: Int): com.example.core.model.FullCredentialModel? = withContext(Dispatchers.IO) {
+        if (!databaseManager.isDatabaseInitialized()) return@withContext null
+        
+        val sessionKey = databaseManager.getSessionVaultKey()
+        val entity = databaseManager.getDatabase().credentialDao().getCredentialById(id) ?: return@withContext null
+        
+        // Decrypt username
+        val usernameBytes = cryptoManager.decryptWithKey(entity.encryptedUsername, entity.usernameIv, sessionKey)
+        val username = String(usernameBytes)
+        usernameBytes.fill(0)
+        
+        // Decrypt password
+        val passwordBytes = cryptoManager.decryptWithKey(entity.encryptedPassword, entity.passwordIv, sessionKey)
+        val password = String(passwordBytes)
+        passwordBytes.fill(0)
+        
+        com.example.core.model.FullCredentialModel(
+            id = entity.id,
+            platform = entity.platformName,
+            username = username,
+            password = password,
+            website = entity.website,
+            categoryId = entity.categoryId
+        )
+    }
+
     suspend fun deletePassword(id: Int) = withContext(Dispatchers.IO) {
         databaseManager.getDatabase().credentialDao().deleteCredential(id)
     }
