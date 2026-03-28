@@ -73,49 +73,65 @@ class CryptoManager @Inject constructor() {
      * Encrypts data using a session-scoped Vault Key (No biometric prompt needed for individual fields).
      */
     suspend fun encryptWithKey(plainBytes: ByteArray, key: ByteArray): Pair<String, String> = withContext(Dispatchers.IO) {
-        val cipher = Cipher.getInstance(transformation)
-        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"))
-        
-        val encryptedBytes = cipher.doFinal(plainBytes)
-        val iv = cipher.iv
-        
-        Pair(
-            Base64.encodeToString(encryptedBytes, Base64.NO_WRAP),
-            Base64.encodeToString(iv, Base64.NO_WRAP)
-        )
+        try {
+            val cipher = Cipher.getInstance(transformation)
+            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"))
+            
+            val encryptedBytes = cipher.doFinal(plainBytes)
+            val iv = cipher.iv
+            
+            Pair(
+                Base64.encodeToString(encryptedBytes, Base64.NO_WRAP),
+                Base64.encodeToString(iv, Base64.NO_WRAP)
+            )
+        } catch (e: Exception) {
+            throw com.example.core.model.VaultError.EncryptionError(e)
+        }
     }
 
     /**
      * Decrypts data using a session-scoped Vault Key.
      */
     suspend fun decryptWithKey(encryptedBase64: String, ivBase64: String, key: ByteArray): ByteArray = withContext(Dispatchers.IO) {
-        val cipher = Cipher.getInstance(transformation)
-        val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
-        val spec = GCMParameterSpec(tagLength, iv)
-        
-        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), spec)
-        
-        val encryptedBytes = Base64.decode(encryptedBase64, Base64.NO_WRAP)
-        cipher.doFinal(encryptedBytes)
+        try {
+            val cipher = Cipher.getInstance(transformation)
+            val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
+            val spec = GCMParameterSpec(tagLength, iv)
+            
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), spec)
+            
+            val encryptedBytes = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+            cipher.doFinal(encryptedBytes)
+        } catch (e: Exception) {
+            throw com.example.core.model.VaultError.DecryptionError(e)
+        }
     }
 
     /**
      * Internal encryption for wrapping keys using the authenticated Master Cipher.
      */
     suspend fun wrapKey(plainBytes: ByteArray, authenticatedCipher: Cipher): Pair<String, String> = withContext(Dispatchers.IO) {
-        val encryptedBytes = authenticatedCipher.doFinal(plainBytes)
-        val iv = authenticatedCipher.iv
-        Pair(
-            Base64.encodeToString(encryptedBytes, Base64.NO_WRAP),
-            Base64.encodeToString(iv, Base64.NO_WRAP)
-        )
+        try {
+            val encryptedBytes = authenticatedCipher.doFinal(plainBytes)
+            val iv = authenticatedCipher.iv
+            Pair(
+                Base64.encodeToString(encryptedBytes, Base64.NO_WRAP),
+                Base64.encodeToString(iv, Base64.NO_WRAP)
+            )
+        } catch (e: Exception) {
+            throw com.example.core.model.VaultError.EncryptionError(e)
+        }
     }
 
     /**
      * Internal decryption for unwrapping keys using the authenticated Master Cipher.
      */
     suspend fun unwrapKey(encryptedBase64: String, authenticatedCipher: Cipher): ByteArray = withContext(Dispatchers.IO) {
-        val encryptedBytes = Base64.decode(encryptedBase64, Base64.NO_WRAP)
-        authenticatedCipher.doFinal(encryptedBytes)
+        try {
+            val encryptedBytes = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+            authenticatedCipher.doFinal(encryptedBytes)
+        } catch (e: Exception) {
+            throw com.example.core.model.VaultError.DecryptionError(e)
+        }
     }
 }

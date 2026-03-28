@@ -39,7 +39,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.compose_ui.components.CFloatingIcon
 import com.example.compose_ui.components.CText
 import com.example.mypasswords.R
-import com.example.mypasswords.ui.theme.*
+import com.example.mypasswords.ui.theme.BackgroundColor
+import com.example.mypasswords.ui.theme.ButtonColor
+import com.example.mypasswords.ui.theme.CircleIconBackGroundColor
+import com.example.mypasswords.ui.theme.CircleIconBorderColor
+import com.example.mypasswords.ui.theme.CircleIconColor
+import com.example.mypasswords.ui.theme.ShieldBlurColor
+import com.example.mypasswords.ui.theme.SubTitleTextColor
+import com.example.mypasswords.ui.theme.TitleTextColor
+import com.example.mypasswords.util.toMessage
 
 @Composable
 fun FingerPrintAuthScreen(
@@ -65,7 +73,8 @@ fun FingerPrintAuthScreen(
                 viewModel.resetState()
             }
             is AuthState.Error -> {
-                Toast.makeText(context, state.message, Toast.LENGTH_LONG).show()
+                val message = state.error.toMessage(context)
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                 if (!state.isFatal) {
                     onCancelClick()
                     viewModel.resetState()

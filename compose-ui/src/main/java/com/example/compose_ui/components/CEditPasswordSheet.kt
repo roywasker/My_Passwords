@@ -70,7 +70,7 @@ fun CEditPasswordSheet(
     var username by remember { mutableStateOf(initialUsername) }
     var password by remember { mutableStateOf(initialPassword) }
     var isPasswordVisible by remember { mutableStateOf(false) }
-    var isImageError by remember { mutableStateOf(false) }
+    var isImageError by remember(website) { mutableStateOf(false) }
     
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 

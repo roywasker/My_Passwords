@@ -43,4 +43,19 @@
     <string name="login_details_subtitle">פרטי התחברות</string>
     <string name="edit">עדכן</string>
     <string name="update_password">עדכון פרטי התחברות</string>
+
+    <!-- Error Messages -->
+    <string name="error_biometric_hardware_missing">אין חומרת טביעת אצבע במכשיר זה.</string>
+    <string name="error_biometric_not_enrolled">לא רשומות טביעות אצבע במכשיר זה.</string>
+    <string name="error_biometric_auth_failed">האימות נכשל. נסה שוב.</string>
+    <string name="error_key_invalidated">מפתחות האבטחה אינם תקפים יותר. יש לאתחל את האפליקציה.</string>
+    <string name="error_uninitialized_vault">הכספת לא אותחלה. נא לבצע אימות מחדש.</string>
+    <string name="error_encryption_failed">נכשל תהליך הצפנת המידע.</string>
+    <string name="error_decryption_failed">נכשל תהליך פענוח המידע.</string>
+    <string name="error_database_access">שגיאה בגישה למסד הנתונים.</string>
+    <string name="error_generic">אירעה שגיאה בלתי צפויה. אנא נסה שוב.</string>
+    <string name="error_save_failed">נכשלה שמירת פרטי ההתחברות.</string>
+    <string name="error_delete_failed">נכשלה מחיקת הפריט.</string>
+    <string name="error_update_failed">נכשל עדכון פרטי ההתחברות.</string>
+    <string name="error_fetch_failed">נכשל אחזור פרטי ההתחברות.</string>
 </resources>

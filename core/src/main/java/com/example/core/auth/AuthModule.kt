@@ -12,7 +12,7 @@ object AuthModule {
 
     @Provides
     @Singleton
-    fun provideAuthRepository(): AuthRepository {
-        return AuthRepository()
+    fun provideAuthRepository(databaseManager: com.example.core.data.DatabaseManager): AuthRepository {
+        return AuthRepository(databaseManager)
     }
 }

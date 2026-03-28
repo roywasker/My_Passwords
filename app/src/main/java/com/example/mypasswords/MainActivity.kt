@@ -111,9 +111,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        // Security: Lock the app when it goes to background
-        authRepository.setAuthenticated(false)
+    override fun onStop() {
+        super.onStop()
+        // Security: Lock the app when it goes to background, but not on rotation
+        if (!isChangingConfigurations) {
+            authRepository.setAuthenticated(false)
+        }
     }
 }

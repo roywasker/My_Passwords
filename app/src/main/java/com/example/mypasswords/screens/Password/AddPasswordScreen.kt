@@ -62,6 +62,10 @@ import com.example.mypasswords.ui.theme.RectangleBackGroundColor
 import com.example.mypasswords.ui.theme.RectangleIconBorderColor
 import com.example.mypasswords.ui.theme.SubTitleTextColor
 import com.example.mypasswords.ui.theme.TitleTextColor
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.platform.LocalContext
+import com.example.mypasswords.util.toMessage
 
 @Composable
 fun AddPasswordScreen(
@@ -69,10 +73,19 @@ fun AddPasswordScreen(
     onBackClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) {
             onBackClick()
+        }
+    }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { error ->
+            snackbarHostState.showSnackbar(error.toMessage(context))
+            viewModel.clearError()
         }
     }
 
@@ -81,6 +94,7 @@ fun AddPasswordScreen(
             topBar = {
                 AddPasswordTopBar(onBackClick = onBackClick)
             },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = BackgroundColor
         ) { padding ->
             Column(

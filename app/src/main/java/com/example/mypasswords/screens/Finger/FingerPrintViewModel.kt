@@ -17,11 +17,12 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 import android.security.keystore.KeyPermanentlyInvalidatedException
+import com.example.core.model.VaultError
 
 sealed class AuthState {
     object Idle : AuthState()
     object Success : AuthState()
-    data class Error(val message: String, val isFatal: Boolean = false) : AuthState()
+    data class Error(val error: VaultError, val isFatal: Boolean = false) : AuthState()
 }
 
 @HiltViewModel
@@ -49,15 +50,16 @@ class FingerPrintViewModel @Inject constructor(
                     cryptoObject = cryptoObject,
                     onSuccess = { result -> onAuthenticationSucceeded(result) },
                     onError = { error -> onAuthenticationError(error) },
-                    onFailed = { /* Handle failure */ }
+                    onFailed = { onAuthenticationFailed() }
                 )
             } catch (e: KeyPermanentlyInvalidatedException) {
                 _authState.value = AuthState.Error(
-                    application.getString(R.string.fingerprint_auth_error_key_invalidated),
+                    VaultError.KeyInvalidated,
                     isFatal = true
                 )
             } catch (e: Exception) {
-                _authState.value = AuthState.Error(application.getString(R.string.fingerprint_auth_error_security))
+                val error = if (e is VaultError) e else VaultError.GenericError(e)
+                _authState.value = AuthState.Error(error)
             }
         }
     }
@@ -71,16 +73,21 @@ class FingerPrintViewModel @Inject constructor(
                     authRepository.setAuthenticated(true)
                     _authState.value = AuthState.Success
                 } catch (e: Exception) {
-                    _authState.value = AuthState.Error(application.getString(R.string.fingerprint_auth_error_vault_init))
+                    val error = if (e is VaultError) e else VaultError.DatabaseError(e)
+                    _authState.value = AuthState.Error(error)
                 }
             }
         } else {
-            _authState.value = AuthState.Error(application.getString(R.string.fingerprint_auth_error_cipher_not_released))
+            _authState.value = AuthState.Error(VaultError.GenericError(messageOverride = "Cipher not released"))
         }
     }
 
     private fun onAuthenticationError(error: String) {
-        _authState.value = AuthState.Error(error)
+        _authState.value = AuthState.Error(VaultError.GenericError(messageOverride = error))
+    }
+
+    private fun onAuthenticationFailed() {
+        _authState.value = AuthState.Error(VaultError.BiometricAuthFailed)
     }
 
     fun resetState() {

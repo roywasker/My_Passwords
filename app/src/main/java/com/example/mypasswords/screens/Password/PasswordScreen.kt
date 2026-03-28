@@ -31,22 +31,25 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,9 +63,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.example.compose_ui.components.CCategoryItem
 import com.example.compose_ui.components.CCategoryList
-import com.example.compose_ui.components.CPasswordDetailSheet
 import com.example.compose_ui.components.CEditPasswordSheet
 import com.example.compose_ui.components.CFloatingIcon
+import com.example.compose_ui.components.CPasswordDetailSheet
 import com.example.compose_ui.components.CText
 import com.example.core.model.PasswordItemModel
 import com.example.mypasswords.R
@@ -77,6 +80,7 @@ import com.example.mypasswords.ui.theme.RectangleBackGroundColor
 import com.example.mypasswords.ui.theme.RectangleIconBorderColor
 import com.example.mypasswords.ui.theme.SubTitleTextColor
 import com.example.mypasswords.ui.theme.TitleTextColor
+import com.example.mypasswords.util.toMessage
 
 @Composable
 fun PasswordScreen(
@@ -86,112 +90,120 @@ fun PasswordScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val filteredPasswords by viewModel.filteredPasswords.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     BackHandler {
         onBackClick()
     }
 
-    Box(
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let { error ->
+            snackbarHostState.showSnackbar(error.toMessage(context))
+            viewModel.clearError()
+        }
+    }
+
+    Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundColor)
-            .systemBarsPadding()
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+            .systemBarsPadding(),
+        containerColor = BackgroundColor,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = { AddPasswordFAB(onAddClick = onAddClick) }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
         ) {
-            // Top Bar
-            PasswordTopBar(
-                isSearchActive = uiState.isSearchActive,
-                searchQuery = uiState.searchQuery,
-                onSearchQueryChanged = viewModel::onSearchQueryChanged,
-                onToggleSearch = viewModel::onToggleSearch
-            )
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                PasswordTopBar(
+                    isSearchActive = uiState.isSearchActive,
+                    searchQuery = uiState.searchQuery,
+                    onSearchQueryChanged = viewModel::onSearchQueryChanged,
+                    onToggleSearch = viewModel::onToggleSearch
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            // Categories
-            CCategoryList(
-                categories = uiState.categories.map { chip -> CCategoryItem(chip.id, chip.name) },
-                selectedCategoryId = uiState.selectedCategoryId,
-                onCategorySelected = viewModel::onCategorySelected,
-                reverseLayout = true,
-                contentPadding = PaddingValues(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
-                activeColor = ButtonColor,
-                inactiveColor = RectangleBackGroundColor,
-                activeTextColor = TitleTextColor,
-                inactiveTextColor = SubTitleTextColor,
-                borderColor = RectangleIconBorderColor
-            )
+                CCategoryList(
+                    categories = uiState.categories.map { chip -> CCategoryItem(chip.id, chip.name) },
+                    selectedCategoryId = uiState.selectedCategoryId,
+                    onCategorySelected = viewModel::onCategorySelected,
+                    reverseLayout = true,
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+                    activeColor = ButtonColor,
+                    inactiveColor = RectangleBackGroundColor,
+                    activeTextColor = TitleTextColor,
+                    inactiveTextColor = SubTitleTextColor,
+                    borderColor = RectangleIconBorderColor
+                )
 
-            Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            // Passwords List
-            PasswordList(
-                passwords = filteredPasswords,
-                onDeletePassword = viewModel::showDeleteConfirmation,
-                onPasswordClick = viewModel::onPasswordClick,
-                onEditPassword = viewModel::onEditClick
-            )
-            // Edit Password Bottom Sheet
-            uiState.itemToEdit?.let { detail ->
-                CEditPasswordSheet(
+                PasswordList(
+                    passwords = filteredPasswords,
+                    onDeletePassword = viewModel::showDeleteConfirmation,
+                    onPasswordClick = viewModel::onPasswordClick,
+                    onEditPassword = viewModel::onEditClick
+                )
+                uiState.itemToEdit?.let { detail ->
+                    CEditPasswordSheet(
+                        platformName = detail.platform,
+                        initialUsername = String(detail.username),
+                        initialPassword = String(detail.password),
+                        website = detail.website,
+                        onDismiss = viewModel::dismissEdit,
+                        onUpdate = viewModel::updateCredential,
+                        titleTextColor = TitleTextColor,
+                        subTitleTextColor = SubTitleTextColor,
+                        buttonColor = ButtonColor,
+                        backgroundColor = BackgroundColor,
+                        fieldBackgroundColor = RectangleBackGroundColor,
+                        fieldBorderColor = RectangleIconBorderColor,
+                        title = stringResource(id = R.string.update_password),
+                        usernameLabel = stringResource(id = R.string.username_label),
+                        passwordLabel = stringResource(id = R.string.password_label),
+                        updateButtonText = stringResource(id = R.string.edit)
+                    )
+                }
+            }
+
+            uiState.selectedItemDetail?.let { detail ->
+                CPasswordDetailSheet(
                     platformName = detail.platform,
-                    initialUsername = String(detail.username),
-                    initialPassword = String(detail.password),
+                    username = detail.username,
+                    password = detail.password,
                     website = detail.website,
-                    onDismiss = viewModel::dismissEdit,
-                    onUpdate = viewModel::updateCredential,
+                    onDismiss = viewModel::dismissPasswordDetail,
                     titleTextColor = TitleTextColor,
                     subTitleTextColor = SubTitleTextColor,
                     buttonColor = ButtonColor,
                     backgroundColor = BackgroundColor,
                     fieldBackgroundColor = RectangleBackGroundColor,
                     fieldBorderColor = RectangleIconBorderColor,
-                    title = stringResource(id = R.string.update_password),
+                    closeButtonText = stringResource(id = R.string.close_btn),
                     usernameLabel = stringResource(id = R.string.username_label),
                     passwordLabel = stringResource(id = R.string.password_label),
-                    updateButtonText = stringResource(id = R.string.edit)
+                    loginDetailsSubtitle = stringResource(id = R.string.login_details_subtitle)
                 )
             }
+
+            uiState.itemToDelete?.let { item ->
+                DeleteConfirmationDialog(
+                    platformName = item.platform,
+                    onConfirm = viewModel::confirmDelete,
+                    onDismiss = viewModel::dismissDeleteConfirmation
+                )
+            }
+
+            BottomBlurEffect()
         }
-
-        // Password Detail Bottom Sheet
-        uiState.selectedItemDetail?.let { detail ->
-            CPasswordDetailSheet(
-                platformName = detail.platform,
-                username = detail.username,
-                password = detail.password,
-                website = detail.website,
-                onDismiss = viewModel::dismissPasswordDetail,
-                titleTextColor = TitleTextColor,
-                subTitleTextColor = SubTitleTextColor,
-                buttonColor = ButtonColor,
-                backgroundColor = BackgroundColor,
-                fieldBackgroundColor = RectangleBackGroundColor,
-                fieldBorderColor = RectangleIconBorderColor,
-                closeButtonText = stringResource(id = R.string.close_btn),
-                usernameLabel = stringResource(id = R.string.username_label),
-                passwordLabel = stringResource(id = R.string.password_label),
-                loginDetailsSubtitle = stringResource(id = R.string.login_details_subtitle)
-            )
-        }
-
-        // Delete Confirmation Dialog
-        uiState.itemToDelete?.let { item ->
-            DeleteConfirmationDialog(
-                platformName = item.platform,
-                onConfirm = viewModel::confirmDelete,
-                onDismiss = viewModel::dismissDeleteConfirmation
-            )
-        }
-
-        // Bottom blur effect
-        BottomBlurEffect()
-
-        // FAB
-        AddPasswordFAB(onAddClick = onAddClick)
     }
 }
 
@@ -335,11 +347,10 @@ private fun BoxScope.BottomBlurEffect() {
 }
 
 @Composable
-private fun BoxScope.AddPasswordFAB(onAddClick: () -> Unit) {
+private fun AddPasswordFAB(onAddClick: () -> Unit) {
     FloatingActionButton(
         onClick = onAddClick,
         modifier = Modifier
-            .align(AbsoluteAlignment.BottomLeft)
             .padding(start = 24.dp, bottom = 40.dp)
             .size(65.dp),
         containerColor = ButtonColor,
@@ -441,7 +452,7 @@ fun PasswordCard(
         }
 
         // Platform Icon
-        var isImageError by remember { mutableStateOf(false) }
+        var isImageError by remember(item.id) { mutableStateOf(false) }
 
         Box(
             modifier = Modifier

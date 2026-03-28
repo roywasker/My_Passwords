@@ -21,7 +21,8 @@ data class AddPasswordUiState(
     val username: CharArray = charArrayOf(),
     val password: CharArray = charArrayOf(),
     val isSaveEnabled: Boolean = false,
-    val isSaved: Boolean = false
+    val isSaved: Boolean = false,
+    val error: com.example.core.model.VaultError? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -32,6 +33,7 @@ data class AddPasswordUiState(
         if (selectedCategoryId != other.selectedCategoryId) return false
         if (isSaveEnabled != other.isSaveEnabled) return false
         if (isSaved != other.isSaved) return false
+        if (error != other.error) return false
         if (categories != other.categories) return false
         if (platformName != other.platformName) return false
         if (!username.contentEquals(other.username)) return false
@@ -44,6 +46,7 @@ data class AddPasswordUiState(
         var result = selectedCategoryId
         result = 31 * result + isSaveEnabled.hashCode()
         result = 31 * result + isSaved.hashCode()
+        result = 31 * result + (error?.hashCode() ?: 0)
         result = 31 * result + categories.hashCode()
         result = 31 * result + platformName.hashCode()
         result = 31 * result + username.contentHashCode()
@@ -98,35 +101,53 @@ class AddPasswordViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isSaveEnabled) {
             viewModelScope.launch {
-                val icon = state.platformName.trim().lowercase() + ".com"
-                
-                // Convert CharArray to ByteArray for encryption
-                val usernameBytes = String(state.username).toByteArray()
-                val passwordBytes = String(state.password).toByteArray()
-                
-                val credential = Credential(
-                    platformName = state.platformName,
-                    username = usernameBytes,
-                    password = passwordBytes,
-                    website = "https://www.google.com/s2/favicons?domain=${icon}&sz=128",
-                    categoryId = state.selectedCategoryId
-                )
-                
-                passwordRepository.addPassword(credential)
-                
-                // Clear all sensitive data
-                credential.clear()
-                usernameBytes.fill(0)
-                passwordBytes.fill(0)
-                state.username.fill(' ')
-                state.password.fill(' ')
-                
-                _uiState.update { it.copy(
-                    isSaved = true,
-                    username = charArrayOf(),
-                    password = charArrayOf()
-                ) }
+                try {
+                    val domain = state.platformName.trim().lowercase()
+                        .replace("\\s+".toRegex(), "") // Remove all spaces
+                        .replace("[^a-z0-9]".toRegex(), "") // Remove non-alphanumeric
+                    
+                    val iconUrl = if (domain.length >= 3) {
+                        "https://www.google.com/s2/favicons?domain=${domain}.com&sz=128"
+                    } else {
+                        ""
+                    }
+                    
+                    // Convert CharArray to ByteArray for encryption
+                    val usernameBytes = String(state.username).toByteArray()
+                    val passwordBytes = String(state.password).toByteArray()
+                    
+                    val credential = Credential(
+                        platformName = state.platformName,
+                        username = usernameBytes,
+                        password = passwordBytes,
+                        website = iconUrl,
+                        categoryId = state.selectedCategoryId
+                    )
+                    
+                    passwordRepository.addPassword(credential)
+                    
+                    // Clear all sensitive data
+                    credential.clear()
+                    usernameBytes.fill(0)
+                    passwordBytes.fill(0)
+                    state.username.fill(' ')
+                    state.password.fill(' ')
+                    
+                    _uiState.update { it.copy(
+                        isSaved = true,
+                        username = charArrayOf(),
+                        password = charArrayOf(),
+                        error = null
+                    ) }
+                } catch (e: Exception) {
+                    val vaultError = if (e is com.example.core.model.VaultError) e else com.example.core.model.VaultError.GenericError(e)
+                    _uiState.update { it.copy(error = vaultError) }
+                }
             }
         }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
     }
 }

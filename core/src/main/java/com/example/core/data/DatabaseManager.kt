@@ -12,6 +12,7 @@ import javax.crypto.Cipher
 import javax.inject.Inject
 import javax.inject.Singleton
 import androidx.core.content.edit
+import kotlinx.coroutines.flow.asStateFlow
 
 @Singleton
 class DatabaseManager @Inject constructor(
@@ -40,17 +41,20 @@ class DatabaseManager @Inject constructor(
     private val PASSPHRASE_KEY = "encrypted_db_passphrase"
     private val PASSPHRASE_IV_KEY = "db_passphrase_iv"
 
-    fun isDatabaseInitialized(): Boolean = database != null && sessionVaultKey != null
+    private val _isInitialized = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val isInitialized = _isInitialized.asStateFlow()
+
+    fun isDatabaseInitialized(): Boolean = _isInitialized.value
 
     fun getDatabase(): VaultDatabase {
-        return database ?: throw IllegalStateException("Database not initialized. Biometric auth required.")
+        return database ?: throw com.example.core.model.VaultError.UninitializedVault
     }
 
     /**
      * Security: Returns the in-memory Vault Key for field-level encryption.
      */
     fun getSessionVaultKey(): ByteArray {
-        return sessionVaultKey ?: throw IllegalStateException("Session key not available. Biometric auth required.")
+        return sessionVaultKey ?: throw com.example.core.model.VaultError.UninitializedVault
     }
 
     /**
@@ -58,39 +62,60 @@ class DatabaseManager @Inject constructor(
      */
     fun getPassphraseCipher(): Cipher {
         val encryptedPassphrase = sharedPrefs.getString(PASSPHRASE_KEY, null)
-        return if (encryptedPassphrase == null) {
-            cryptoManager.getMasterEncryptionCipher()
-        } else {
-            val ivBase64 = sharedPrefs.getString(PASSPHRASE_IV_KEY, null)
-                ?: throw IllegalStateException("IV missing for encrypted passphrase")
-            val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
-            cryptoManager.getMasterDecryptionCipher(iv)
+        return try {
+            if (encryptedPassphrase == null) {
+                cryptoManager.getMasterEncryptionCipher()
+            } else {
+                val ivBase64 = sharedPrefs.getString(PASSPHRASE_IV_KEY, null)
+                    ?: throw IllegalStateException("IV missing for encrypted passphrase")
+                val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
+                cryptoManager.getMasterDecryptionCipher(iv)
+            }
+        } catch (e: Exception) {
+            throw com.example.core.model.VaultError.GenericError(e)
         }
     }
 
     suspend fun initializeDatabase(authenticatedCipher: Cipher) {
-        val encryptedPassphraseBase64 = sharedPrefs.getString(PASSPHRASE_KEY, null)
-        
-        val passphrase = if (encryptedPassphraseBase64 == null) {
-            // First time: Generate and wrap
-            val newPassphrase = ByteArray(32).apply { SecureRandom().nextBytes(this) }
-            val (encrypted, iv) = cryptoManager.wrapKey(newPassphrase.copyOf(), authenticatedCipher)
+        try {
+            val encryptedPassphraseBase64 = sharedPrefs.getString(PASSPHRASE_KEY, null)
             
-            sharedPrefs.edit {
-                putString(PASSPHRASE_KEY, encrypted)
-                putString(PASSPHRASE_IV_KEY, iv)
+            val passphrase = if (encryptedPassphraseBase64 == null) {
+                // First time: Generate and wrap
+                val newPassphrase = ByteArray(32).apply { SecureRandom().nextBytes(this) }
+                val (encrypted, iv) = cryptoManager.wrapKey(newPassphrase.copyOf(), authenticatedCipher)
+                
+                sharedPrefs.edit {
+                    putString(PASSPHRASE_KEY, encrypted)
+                    putString(PASSPHRASE_IV_KEY, iv)
+                }
+                
+                newPassphrase
+            } else {
+                // Subsequent times: Unwrap
+                cryptoManager.unwrapKey(encryptedPassphraseBase64, authenticatedCipher)
             }
-            
-            newPassphrase
-        } else {
-            // Subsequent times: Unwrap
-            cryptoManager.unwrapKey(encryptedPassphraseBase64, authenticatedCipher)
-        }
 
-        sessionVaultKey = passphrase.copyOf()
-        database = VaultDatabase.build(context, passphrase)
-        
-        // Security: Clear the local reference to passphrase (Room now has its copy)
-        passphrase.fill(0)
+            // Close existing database if any
+            database?.close()
+            sessionVaultKey?.fill(0)
+
+            sessionVaultKey = passphrase.copyOf()
+            database = VaultDatabase.build(context, passphrase)
+            _isInitialized.value = true
+            
+            // Security: Clear the local reference to passphrase (Room now has its copy)
+            passphrase.fill(0)
+        } catch (e: Exception) {
+            throw com.example.core.model.VaultError.DatabaseError(e)
+        }
+    }
+
+    fun clearSession() {
+        database?.close()
+        database = null
+        sessionVaultKey?.fill(0)
+        sessionVaultKey = null
+        _isInitialized.value = false
     }
 }
