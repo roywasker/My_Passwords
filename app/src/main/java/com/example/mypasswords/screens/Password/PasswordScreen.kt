@@ -68,6 +68,7 @@ import com.example.compose_ui.components.CFloatingIcon
 import com.example.compose_ui.components.CPasswordDetailSheet
 import com.example.compose_ui.components.CText
 import com.example.core.model.PasswordItemModel
+import com.example.core.util.PasswordGenerator
 import com.example.mypasswords.R
 import com.example.mypasswords.ui.theme.BackgroundColor
 import com.example.mypasswords.ui.theme.ButtonColor
@@ -160,6 +161,7 @@ fun PasswordScreen(
                         website = detail.website,
                         onDismiss = viewModel::dismissEdit,
                         onUpdate = viewModel::updateCredential,
+                        onGeneratePassword = { PasswordGenerator.generate() },
                         titleTextColor = TitleTextColor,
                         subTitleTextColor = SubTitleTextColor,
                         buttonColor = ButtonColor,

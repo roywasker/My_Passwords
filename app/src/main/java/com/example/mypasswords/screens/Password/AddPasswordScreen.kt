@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cached
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LockOpen
@@ -159,12 +160,21 @@ fun AddPasswordScreen(
                     placeholder = "••••••••••••",
                     leadingIcon = Icons.Default.LockOpen,
                     trailingIcon = {
-                        IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
-                            Icon(
-                                imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                contentDescription = null,
-                                tint = SubTitleTextColor
-                            )
+                        Row {
+                            IconButton(onClick = viewModel::onGeneratePasswordClicked) {
+                                Icon(
+                                    imageVector = Icons.Default.Cached,
+                                    contentDescription = "Generate",
+                                    tint = ButtonColor
+                                )
+                            }
+                            IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
+                                Icon(
+                                    imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    contentDescription = null,
+                                    tint = SubTitleTextColor
+                                )
+                            }
                         }
                     },
                     visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation()

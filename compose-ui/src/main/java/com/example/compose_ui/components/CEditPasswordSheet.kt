@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cached
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Cached
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
@@ -56,6 +58,7 @@ fun CEditPasswordSheet(
     website: String,
     onDismiss: () -> Unit,
     onUpdate: (String, String) -> Unit,
+    onGeneratePassword: (() -> String)? = null,
     titleTextColor: Color = Color.White,
     subTitleTextColor: Color = Color(0xFF94A3B8),
     buttonColor: Color = Color(0xFF1D4ED8),
@@ -161,7 +164,8 @@ fun CEditPasswordSheet(
                     textColor = titleTextColor,
                     isPassword = true,
                     isPasswordVisible = isPasswordVisible,
-                    onTogglePasswordVisibility = { isPasswordVisible = !isPasswordVisible }
+                    onTogglePasswordVisibility = { isPasswordVisible = !isPasswordVisible },
+                    onGeneratePassword = onGeneratePassword?.let { { password = it() } }
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -199,7 +203,8 @@ private fun EditFieldGroup(
     textColor: Color,
     isPassword: Boolean = false,
     isPasswordVisible: Boolean = false,
-    onTogglePasswordVisibility: (() -> Unit)? = null
+    onTogglePasswordVisibility: (() -> Unit)? = null,
+    onGeneratePassword: (() -> Unit)? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         CText(
@@ -236,12 +241,23 @@ private fun EditFieldGroup(
             keyboardOptions = KeyboardOptions(keyboardType = if (isPassword) KeyboardType.Password else KeyboardType.Text),
             trailingIcon = if (isPassword) {
                 {
-                    IconButton(onClick = { onTogglePasswordVisibility?.invoke() }) {
-                        Icon(
-                            imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            contentDescription = null,
-                            tint = labelColor
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (onGeneratePassword != null) {
+                            IconButton(onClick = onGeneratePassword) {
+                                Icon(
+                                    imageVector = Icons.Default.Cached,
+                                    contentDescription = null,
+                                    tint = textColor.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                        IconButton(onClick = { onTogglePasswordVisibility?.invoke() }) {
+                            Icon(
+                                imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = labelColor
+                            )
+                        }
                     }
                 }
             } else null

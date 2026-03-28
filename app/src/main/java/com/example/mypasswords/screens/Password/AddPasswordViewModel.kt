@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.data.PasswordRepository
 import com.example.core.model.CategoryChip
 import com.example.core.model.Credential
+import com.example.core.util.PasswordGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -87,6 +88,11 @@ class AddPasswordViewModel @Inject constructor(
     fun onPasswordChanged(pass: String) {
         val passArray = pass.toCharArray()
         _uiState.update { it.copy(password = passArray, isSaveEnabled = validate(it.platformName, it.username, passArray)) }
+    }
+
+    fun onGeneratePasswordClicked() {
+        val generatedPassword = PasswordGenerator.generate()
+        onPasswordChanged(generatedPassword)
     }
 
     fun onCategorySelected(categoryId: Int) {
