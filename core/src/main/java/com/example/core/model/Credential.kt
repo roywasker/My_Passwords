@@ -1,15 +1,15 @@
 package com.example.core.model
 
 /**
- * Plaintext model used only in memory.
- * Fields should be zeroed out as soon as they are no longer needed.
+ * Plaintext model used only in memory. Fields should be zeroed out as soon as they are no longer
+ * needed.
  */
 data class Credential(
     val platformName: String,
     val username: ByteArray,
     val password: ByteArray,
     val website: String = "",
-    val categoryId: Int = 1
+    val categoryId: Int = 1,
 ) {
     fun clear() {
         username.fill(0)
@@ -26,6 +26,7 @@ data class Credential(
         if (!username.contentEquals(other.username)) return false
         if (!password.contentEquals(other.password)) return false
         if (website != other.website) return false
+        if (categoryId != other.categoryId) return false
 
         return true
     }
@@ -35,6 +36,7 @@ data class Credential(
         result = 31 * result + username.contentHashCode()
         result = 31 * result + password.contentHashCode()
         result = 31 * result + website.hashCode()
+        result = 31 * result + categoryId
         return result
     }
 }

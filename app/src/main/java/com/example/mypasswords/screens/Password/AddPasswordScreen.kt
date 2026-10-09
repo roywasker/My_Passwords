@@ -14,7 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cached
 import androidx.compose.material.icons.filled.Close
@@ -31,6 +33,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -63,15 +68,12 @@ import com.example.mypasswords.ui.theme.RectangleBackGroundColor
 import com.example.mypasswords.ui.theme.RectangleIconBorderColor
 import com.example.mypasswords.ui.theme.SubTitleTextColor
 import com.example.mypasswords.ui.theme.TitleTextColor
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.ui.platform.LocalContext
 import com.example.mypasswords.util.toMessage
 
 @Composable
 fun AddPasswordScreen(
     viewModel: AddPasswordViewModel = hiltViewModel(),
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -96,15 +98,16 @@ fun AddPasswordScreen(
                 AddPasswordTopBar(onBackClick = onBackClick)
             },
             snackbarHost = { SnackbarHost(snackbarHostState) },
-            containerColor = BackgroundColor
+            containerColor = BackgroundColor,
         ) { padding ->
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 24.dp)
-                    .background(BackgroundColor),
-                horizontalAlignment = Alignment.Start
+                modifier =
+                    Modifier.fillMaxSize()
+                        .padding(padding)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp)
+                        .background(BackgroundColor),
+                horizontalAlignment = Alignment.Start,
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -114,14 +117,15 @@ fun AddPasswordScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 CCategoryList(
-                    categories = uiState.categories.map { chip -> CCategoryItem(chip.id, chip.name) },
+                    categories =
+                        uiState.categories.map { chip -> CCategoryItem(chip.id, chip.name) },
                     selectedCategoryId = uiState.selectedCategoryId,
                     onCategorySelected = viewModel::onCategorySelected,
                     activeColor = ButtonColor,
                     inactiveColor = RectangleBackGroundColor,
                     activeTextColor = TitleTextColor,
                     inactiveTextColor = SubTitleTextColor,
-                    borderColor = RectangleIconBorderColor
+                    borderColor = RectangleIconBorderColor,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -133,7 +137,8 @@ fun AddPasswordScreen(
                     value = uiState.platformName,
                     onValueChange = viewModel::onPlatformNameChanged,
                     placeholder = stringResource(id = R.string.platform_name_placeholder),
-                    leadingIcon = Icons.Default.GridView
+                    enabled = !uiState.isSaving,
+                    leadingIcon = Icons.Default.GridView,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -145,7 +150,8 @@ fun AddPasswordScreen(
                     value = String(uiState.username),
                     onValueChange = viewModel::onUsernameChanged,
                     placeholder = stringResource(id = R.string.username_email_placeholder),
-                    leadingIcon = Icons.Default.PersonOutline
+                    enabled = !uiState.isSaving,
+                    leadingIcon = Icons.Default.PersonOutline,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -158,6 +164,7 @@ fun AddPasswordScreen(
                     value = String(uiState.password),
                     onValueChange = viewModel::onPasswordChanged,
                     placeholder = "••••••••••••",
+                    enabled = !uiState.isSaving,
                     leadingIcon = Icons.Default.LockOpen,
                     trailingIcon = {
                         Row {
@@ -165,19 +172,23 @@ fun AddPasswordScreen(
                                 Icon(
                                     imageVector = Icons.Default.Cached,
                                     contentDescription = "Generate",
-                                    tint = ButtonColor
+                                    tint = ButtonColor,
                                 )
                             }
                             IconButton(onClick = { isPasswordVisible = !isPasswordVisible }) {
                                 Icon(
-                                    imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                    imageVector =
+                                        if (isPasswordVisible) Icons.Default.Visibility
+                                        else Icons.Default.VisibilityOff,
                                     contentDescription = null,
-                                    tint = SubTitleTextColor
+                                    tint = SubTitleTextColor,
                                 )
                             }
                         }
                     },
-                    visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation()
+                    visualTransformation =
+                        if (isPasswordVisible) VisualTransformation.None
+                        else PasswordVisualTransformation(),
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -185,26 +196,25 @@ fun AddPasswordScreen(
                 // Security Notice
                 SecurityNotice()
 
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 // Action Buttons
                 Button(
                     onClick = viewModel::onSaveClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
                     enabled = uiState.isSaveEnabled,
                     shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = ButtonColor,
-                        disabledContainerColor = ButtonColor.copy(alpha = 0.5f)
-                    )
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = ButtonColor,
+                            disabledContainerColor = ButtonColor.copy(alpha = 0.5f),
+                        ),
                 ) {
                     CText(
                         text = stringResource(id = R.string.save_now_btn),
                         color = Color.White,
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
 
@@ -217,21 +227,18 @@ fun AddPasswordScreen(
 @Composable
 private fun AddPasswordTopBar(onBackClick: () -> Unit) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .height(64.dp)
-            .padding(horizontal = 8.dp)
+        modifier =
+            Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 8.dp)
     ) {
         // Icon (X) on the right (Start in RTL)
         IconButton(
             onClick = onBackClick,
-            modifier = Modifier.align(Alignment.CenterStart)
+            modifier = Modifier.align(Alignment.CenterStart),
         ) {
             Icon(
                 imageVector = Icons.Default.Close,
                 contentDescription = null,
-                tint = TitleTextColor
+                tint = TitleTextColor,
             )
         }
 
@@ -241,11 +248,10 @@ private fun AddPasswordTopBar(onBackClick: () -> Unit) {
             color = TitleTextColor,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Center)
+            modifier = Modifier.align(Alignment.Center),
         )
     }
 }
-
 
 @Composable
 private fun AddPasswordFieldLabel(label: String) {
@@ -255,7 +261,7 @@ private fun AddPasswordFieldLabel(label: String) {
         fontSize = 14.sp,
         fontWeight = FontWeight.Bold,
         textAlign = TextAlign.Start,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
@@ -266,29 +272,32 @@ private fun AddPasswordTextField(
     placeholder: String,
     leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     trailingIcon: (@Composable () -> Unit)? = null,
-    visualTransformation: VisualTransformation = VisualTransformation.None
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    enabled: Boolean = true,
 ) {
     OutlinedTextField(
         value = value,
+        enabled = enabled,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = TitleTextColor,
-            unfocusedTextColor = TitleTextColor,
-            focusedBorderColor = RectangleIconBorderColor,
-            unfocusedBorderColor = RectangleIconBorderColor,
-            focusedContainerColor = RectangleBackGroundColor,
-            unfocusedContainerColor = RectangleBackGroundColor,
-            cursorColor = ButtonColor
-        ),
+        colors =
+            OutlinedTextFieldDefaults.colors(
+                focusedTextColor = TitleTextColor,
+                unfocusedTextColor = TitleTextColor,
+                focusedBorderColor = RectangleIconBorderColor,
+                unfocusedBorderColor = RectangleIconBorderColor,
+                focusedContainerColor = RectangleBackGroundColor,
+                unfocusedContainerColor = RectangleBackGroundColor,
+                cursorColor = ButtonColor,
+            ),
         placeholder = {
             CText(
                 text = placeholder,
                 color = SubTitleTextColor,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Start,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             )
         },
         leadingIcon = {
@@ -296,43 +305,44 @@ private fun AddPasswordTextField(
                 Icon(
                     imageVector = leadingIcon,
                     contentDescription = null,
-                    tint = TitleTextColor
+                    tint = TitleTextColor,
                 )
             }
         },
         trailingIcon = trailingIcon,
         visualTransformation = visualTransformation,
         singleLine = true,
-        textStyle = androidx.compose.ui.text.TextStyle(
-            textAlign = TextAlign.Start,
-            fontSize = 14.sp
-        )
+        textStyle =
+            androidx.compose.ui.text.TextStyle(
+                textAlign = TextAlign.Start,
+                fontSize = 14.sp,
+            ),
     )
 }
 
 @Composable
 private fun SecurityNotice() {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .border(
-                width = 1.dp,
-                color = RectangleIconBorderColor,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(16.dp)
+        modifier =
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .border(
+                    width = 1.dp,
+                    color = RectangleIconBorderColor,
+                    shape = RoundedCornerShape(12.dp),
+                )
+                .padding(16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
+            horizontalArrangement = Arrangement.Start,
         ) {
             Icon(
                 imageVector = Icons.Default.Shield,
                 contentDescription = null,
                 tint = Color(0xFF10B981), // Green shield
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp),
             )
             Spacer(modifier = Modifier.width(12.dp))
             CText(
@@ -341,7 +351,7 @@ private fun SecurityNotice() {
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
                 textAlign = TextAlign.Start,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
         }
     }

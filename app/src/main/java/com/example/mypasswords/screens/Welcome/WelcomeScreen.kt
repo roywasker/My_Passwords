@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Devices
@@ -55,21 +57,16 @@ import com.example.mypasswords.ui.theme.TitleTextColor
 
 @Composable
 fun WelcomeScreen(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundColor)
-    ) {
-
+    Box(modifier = Modifier.fillMaxSize().background(BackgroundColor)) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 40.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier =
+                Modifier.fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp, vertical = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth()
-                    .padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                 horizontalArrangement = Arrangement.End,
             ) {
                 CFloatingIcon(
@@ -95,7 +92,7 @@ fun WelcomeScreen(onClick: () -> Unit) {
                 fontSize = 28.sp,
                 lineHeight = 34.sp,
                 textAlign = TextAlign.Center,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.ExtraBold,
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -106,7 +103,7 @@ fun WelcomeScreen(onClick: () -> Unit) {
                 lineHeight = 28.sp,
                 fontSize = 16.sp,
                 textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
             )
 
             Spacer(modifier = Modifier.height(30.dp))
@@ -114,38 +111,42 @@ fun WelcomeScreen(onClick: () -> Unit) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                CIconWithUnderText(icon = Icons.Default.Devices, label = stringResource(id = R.string.welcome_screen_backup_icon))
+                CIconWithUnderText(
+                    icon = Icons.Default.Devices,
+                    label = stringResource(id = R.string.welcome_screen_backup_icon),
+                )
                 VerticalDivider(
                     modifier = Modifier.height(30.dp),
-                    color = Color.DarkGray.copy(alpha = 0.5f)
+                    color = Color.DarkGray.copy(alpha = 0.5f),
                 )
-                CIconWithUnderText(icon = Icons.Default.Sync, label = stringResource(id = R.string.welcome_screen_sync_icon))
+                CIconWithUnderText(
+                    icon = Icons.Default.Sync,
+                    label = stringResource(id = R.string.welcome_screen_sync_icon),
+                )
                 VerticalDivider(
                     modifier = Modifier.height(30.dp),
-                    color = Color.DarkGray.copy(alpha = 0.5f)
+                    color = Color.DarkGray.copy(alpha = 0.5f),
                 )
-                CIconWithUnderText(icon = Icons.Default.LockReset, label = stringResource(id = R.string.welcome_screen_encrypt_icon))
+                CIconWithUnderText(
+                    icon = Icons.Default.LockReset,
+                    label = stringResource(id = R.string.welcome_screen_encrypt_icon),
+                )
             }
 
             Spacer(modifier = Modifier.height(30.dp))
 
             CButton(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp)
-                    .height(64.dp),
-                buttonColor = ButtonDefaults.buttonColors(
-                    containerColor = ButtonColor
-                ),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(64.dp),
+                buttonColor = ButtonDefaults.buttonColors(containerColor = ButtonColor),
                 text = stringResource(id = R.string.welcome_screen_button_text),
                 textColor = Color.White,
                 textFontSize = 18.sp,
                 textFontWeight = FontWeight.Bold,
                 onClick = onClick,
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
-                iconSize = 24.dp
+                iconSize = 24.dp,
             )
         }
     }
@@ -155,41 +156,41 @@ fun WelcomeScreen(onClick: () -> Unit) {
 fun CentralShieldGraphic() {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(240.dp)
-            .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            ShieldBlurColor.copy(alpha = 0.8f),
-                            Color.Transparent
+        modifier =
+            Modifier.size(240.dp)
+                .background(
+                    brush =
+                        Brush.radialGradient(
+                            colors =
+                                listOf(
+                                    ShieldBlurColor.copy(alpha = 0.8f),
+                                    Color.Transparent,
+                                )
                         )
-                    )
-                )
+                ),
     ) {
         Box(
-            modifier = Modifier
-                .size(220.dp)
-                .drawBehind {
+            modifier =
+                Modifier.size(220.dp).drawBehind {
                     drawCircle(
                         color = Color(0xFF1E3A8A).copy(alpha = 0.8f),
-                        style = Stroke(width = 1.dp.toPx())
+                        style = Stroke(width = 1.dp.toPx()),
                     )
                 }
         )
         Box(
-            modifier = Modifier
-                .size(170.dp)
-                .drawBehind {
+            modifier =
+                Modifier.size(170.dp).drawBehind {
                     drawCircle(
                         color = Color(0xFF1E3A8A).copy(alpha = 0.8f),
-                        style = Stroke(width = 1.dp.toPx())
+                        style = Stroke(width = 1.dp.toPx()),
                     )
                 }
         )
 
         Box(
-            modifier = Modifier
-                .size(90.dp),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.size(90.dp),
+            contentAlignment = Alignment.Center,
         ) {
             CImageResource(
                 drawableResId = R.drawable.shield,
@@ -206,9 +207,7 @@ fun CentralShieldGraphic() {
             borderWidth = 1.dp,
             iconTint = CircleIconColor,
             shape = RoundedCornerShape(10.dp),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = (-20).dp, y = 30.dp)
+            modifier = Modifier.align(Alignment.TopEnd).offset(x = (-20).dp, y = 30.dp),
         )
         CFloatingIcon(
             icon = Icons.Default.VpnKey,
@@ -219,13 +218,10 @@ fun CentralShieldGraphic() {
             borderWidth = 1.dp,
             iconTint = CircleIconColor,
             shape = RoundedCornerShape(10.dp),
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .offset(x = 20.dp, y = (-30).dp)
+            modifier = Modifier.align(Alignment.BottomStart).offset(x = 20.dp, y = (-30).dp),
         )
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable

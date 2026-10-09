@@ -69,7 +69,7 @@ fun CPasswordDetailSheet(
     closeButtonText: String,
     usernameLabel: String,
     passwordLabel: String,
-    loginDetailsSubtitle: String
+    loginDetailsSubtitle: String,
 ) {
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isImageError by remember { mutableStateOf(false) }
@@ -79,27 +79,39 @@ fun CPasswordDetailSheet(
     fun copyToClipboard(label: String, text: String, isSensitive: Boolean) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText(label, text)
-        
+        val copyToken = java.util.UUID.randomUUID().toString()
+
         if (isSensitive && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val extras = PersistableBundle().apply {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
-                } else {
-                    putBoolean("android.content.extra.IS_SENSITIVE", true)
+            val extras =
+                PersistableBundle().apply {
+                    putString("com.example.mypasswords.CLIP_COPY_TOKEN", copyToken)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+                    } else {
+                        putBoolean("android.content.extra.IS_SENSITIVE", true)
+                    }
                 }
-            }
             clip.description.extras = extras
         }
-        
+
         clipboard.setPrimaryClip(clip)
-        
+
         // Auto-clear clipboard after 60 seconds for security
         if (isSensitive) {
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (clipboard.primaryClip?.description?.label == label) {
-                    clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                }
-            }, 60000)
+            Handler(Looper.getMainLooper())
+                .postDelayed(
+                    {
+                        if (
+                            clipboard.primaryClip
+                                ?.description
+                                ?.extras
+                                ?.getString("com.example.mypasswords.CLIP_COPY_TOKEN") == copyToken
+                        ) {
+                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                        }
+                    },
+                    60000,
+                )
         }
     }
 
@@ -110,65 +122,62 @@ fun CPasswordDetailSheet(
         dragHandle = {
             BottomSheetDefaults.DragHandle(color = subTitleTextColor.copy(alpha = 0.4f))
         },
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier =
+                    Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 // Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Platform Icon
                     Box(
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(fieldBackgroundColor)
-                            .border(1.dp, fieldBorderColor, RoundedCornerShape(12.dp)),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier.size(56.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(fieldBackgroundColor)
+                                .border(1.dp, fieldBorderColor, RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center,
                     ) {
                         if (website.isNotBlank() && !isImageError) {
                             AsyncImage(
                                 model = website,
                                 contentDescription = platformName,
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(4.dp)),
-                                onError = { isImageError = true }
+                                modifier = Modifier.size(32.dp).clip(RoundedCornerShape(4.dp)),
+                                onError = { isImageError = true },
                             )
                         } else {
                             CText(
                                 text = platformName.firstOrNull()?.uppercase() ?: "",
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = titleTextColor
+                                color = titleTextColor,
                             )
                         }
                     }
 
                     Column(
                         horizontalAlignment = Alignment.Start,
-                        modifier = Modifier.padding(start = 16.dp)
+                        modifier = Modifier.padding(start = 16.dp),
                     ) {
                         CText(
                             text = platformName,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = titleTextColor,
-                            textAlign = TextAlign.Start
+                            textAlign = TextAlign.Start,
                         )
                         CText(
                             text = loginDetailsSubtitle,
                             fontSize = 14.sp,
                             color = subTitleTextColor,
-                            textAlign = TextAlign.Start
+                            textAlign = TextAlign.Start,
                         )
                     }
                 }
@@ -183,7 +192,7 @@ fun CPasswordDetailSheet(
                     valueColor = titleTextColor,
                     backgroundColor = fieldBackgroundColor,
                     borderColor = fieldBorderColor,
-                    onCopy = { copyToClipboard(usernameLabel, String(username), false) }
+                    onCopy = { copyToClipboard(usernameLabel, String(username), false) },
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -199,14 +208,17 @@ fun CPasswordDetailSheet(
                     onCopy = { copyToClipboard(passwordLabel, String(password), true) },
                     trailingIcon = {
                         Icon(
-                            imageVector = if (isPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                            imageVector =
+                                if (isPasswordVisible) Icons.Default.VisibilityOff
+                                else Icons.Default.Visibility,
                             contentDescription = "Toggle Visibility",
                             tint = subTitleTextColor,
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clickable { isPasswordVisible = !isPasswordVisible }
+                            modifier =
+                                Modifier.size(20.dp).clickable {
+                                    isPasswordVisible = !isPasswordVisible
+                                },
                         )
-                    }
+                    },
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -214,17 +226,15 @@ fun CPasswordDetailSheet(
                 // Close Button
                 Button(
                     onClick = onDismiss,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = buttonColor),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(16.dp),
                 ) {
                     CText(
                         text = closeButtonText,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color.White,
                     )
                 }
             }
@@ -241,7 +251,7 @@ private fun DetailFieldGroup(
     backgroundColor: Color,
     borderColor: Color,
     onCopy: () -> Unit,
-    trailingIcon: @Composable (() -> Unit)? = null
+    trailingIcon: @Composable (() -> Unit)? = null,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         CText(
@@ -249,24 +259,24 @@ private fun DetailFieldGroup(
             fontSize = 14.sp,
             color = labelColor,
             modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.Start
+            textAlign = TextAlign.Start,
         )
         Spacer(modifier = Modifier.height(8.dp))
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(backgroundColor)
-                .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier.fillMaxWidth()
+                    .height(56.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(backgroundColor)
+                    .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             CText(
                 text = value,
                 fontSize = 16.sp,
                 color = valueColor,
-                textAlign = TextAlign.Start
+                textAlign = TextAlign.Start,
             )
 
             Spacer(modifier = Modifier.weight(1f))
@@ -280,9 +290,7 @@ private fun DetailFieldGroup(
                 imageVector = Icons.Default.ContentCopy,
                 contentDescription = "Copy",
                 tint = labelColor,
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable { onCopy() }
+                modifier = Modifier.size(20.dp).clickable { onCopy() },
             )
         }
     }

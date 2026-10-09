@@ -1,6 +1,7 @@
 package com.example.mypasswords.screens.finger
 
 import android.app.Application
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import androidx.biometric.BiometricPrompt
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.AndroidViewModel
@@ -8,29 +9,31 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.auth.AuthRepository
 import com.example.core.auth.BiometricAuthManager
 import com.example.core.data.DatabaseManager
+import com.example.core.model.VaultError
 import com.example.mypasswords.R
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-
-import android.security.keystore.KeyPermanentlyInvalidatedException
-import com.example.core.model.VaultError
 
 sealed class AuthState {
     object Idle : AuthState()
+
     object Success : AuthState()
+
     data class Error(val error: VaultError, val isFatal: Boolean = false) : AuthState()
 }
 
 @HiltViewModel
-class FingerPrintViewModel @Inject constructor(
+class FingerPrintViewModel
+@Inject
+constructor(
     private val databaseManager: DatabaseManager,
     private val authRepository: AuthRepository,
     private val biometricAuthManager: BiometricAuthManager,
-    private val application: Application
+    private val application: Application,
 ) : AndroidViewModel(application) {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
@@ -50,16 +53,22 @@ class FingerPrintViewModel @Inject constructor(
                     cryptoObject = cryptoObject,
                     onSuccess = { result -> onAuthenticationSucceeded(result) },
                     onError = { error -> onAuthenticationError(error) },
-                    onFailed = { onAuthenticationFailed() }
+                    onFailed = { onAuthenticationFailed() },
                 )
             } catch (e: KeyPermanentlyInvalidatedException) {
-                _authState.value = AuthState.Error(
-                    VaultError.KeyInvalidated,
-                    isFatal = true
-                )
+                _authState.value =
+                    AuthState.Error(
+                        VaultError.KeyInvalidated,
+                        isFatal = true,
+                    )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 val error = if (e is VaultError) e else VaultError.GenericError(e)
-                _authState.value = AuthState.Error(error)
+                _authState.value =
+                    if (isKeyInvalidated(e))
+                        AuthState.Error(VaultError.KeyInvalidated, isFatal = true)
+                    else AuthState.Error(error)
             }
         }
     }
@@ -72,13 +81,19 @@ class FingerPrintViewModel @Inject constructor(
                     databaseManager.initializeDatabase(cipher)
                     authRepository.setAuthenticated(true)
                     _authState.value = AuthState.Success
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     val error = if (e is VaultError) e else VaultError.DatabaseError(e)
-                    _authState.value = AuthState.Error(error)
+                    _authState.value =
+                        if (isKeyInvalidated(e))
+                            AuthState.Error(VaultError.KeyInvalidated, isFatal = true)
+                        else AuthState.Error(error)
                 }
             }
         } else {
-            _authState.value = AuthState.Error(VaultError.GenericError(messageOverride = "Cipher not released"))
+            _authState.value =
+                AuthState.Error(VaultError.GenericError(messageOverride = "Cipher not released"))
         }
     }
 
@@ -88,6 +103,21 @@ class FingerPrintViewModel @Inject constructor(
 
     private fun onAuthenticationFailed() {
         _authState.value = AuthState.Error(VaultError.BiometricAuthFailed)
+    }
+
+    private fun isKeyInvalidated(error: Throwable): Boolean {
+        var current: Throwable? = error
+        val visited =
+            java.util.Collections.newSetFromMap(java.util.IdentityHashMap<Throwable, Boolean>())
+        while (current != null && visited.add(current)) {
+            if (
+                current is KeyPermanentlyInvalidatedException ||
+                    current === VaultError.KeyInvalidated
+            )
+                return true
+            current = current.cause
+        }
+        return false
     }
 
     fun resetState() {

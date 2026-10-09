@@ -5,10 +5,13 @@ import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.DefaultNavTransitions
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.core.auth.AuthRepository
@@ -24,20 +27,19 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
-    @Inject
-    lateinit var authRepository: AuthRepository
+    @Inject lateinit var authRepository: AuthRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Security: Prevent screenshots and screen recording
         window.setFlags(
             WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
+            WindowManager.LayoutParams.FLAG_SECURE,
         )
-        
+
         enableEdgeToEdge()
-        
+
         setContent {
             MyPasswordsTheme {
                 val navController = rememberNavController()
@@ -45,7 +47,11 @@ class MainActivity : AppCompatActivity() {
 
                 // Security: Navigation guard
                 LaunchedEffect(isAuthenticated) {
-                    if (!isAuthenticated && navController.currentDestination?.route == Routes.PASSWORD) {
+                    if (
+                        !isAuthenticated &&
+                            navController.currentDestination?.route in
+                                setOf(Routes.PASSWORD, Routes.ADD_PASSWORD)
+                    ) {
                         navController.navigate(Routes.WELCOME) {
                             popUpTo(0) { inclusive = true }
                         }
@@ -53,13 +59,27 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 NavHost(
-                    navController = navController, 
-                    startDestination = Routes.WELCOME
+                    navController = navController,
+                    startDestination = Routes.WELCOME,
+                    enterTransition = {
+                        if (
+                            initialState.destination.route == Routes.FINGERPRINT_AUTH &&
+                            targetState.destination.route == Routes.PASSWORD
+                        ) EnterTransition.None
+                        else DefaultNavTransitions.enterTransition.invoke(this)
+                    },
+                    exitTransition = {
+                        if (
+                            initialState.destination.route == Routes.FINGERPRINT_AUTH &&
+                            targetState.destination.route == Routes.PASSWORD
+                        ) ExitTransition.None
+                        else DefaultNavTransitions.exitTransition.invoke(this)
+                    },
                 ) {
                     composable(Routes.WELCOME) {
                         WelcomeScreen(onClick = { navController.navigate(Routes.FINGERPRINT_AUTH) })
                     }
-                    
+
                     composable(Routes.FINGERPRINT_AUTH) {
                         FingerPrintAuthScreen(
                             onSuccess = {
@@ -69,10 +89,10 @@ class MainActivity : AppCompatActivity() {
                             },
                             onCancelClick = {
                                 navController.popBackStack()
-                            }
+                            },
                         )
                     }
-                    
+
                     composable(Routes.PASSWORD) {
                         if (isAuthenticated) {
                             PasswordScreen(
@@ -84,10 +104,10 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 onAddClick = {
                                     navController.navigate(Routes.ADD_PASSWORD)
-                                }
+                                },
                             )
                         } else {
-                            // This case is handled by the LaunchedEffect guard, 
+                            // This case is handled by the LaunchedEffect guard,
                             // but adding a fallback for safety.
                             LaunchedEffect(Unit) {
                                 navController.navigate(Routes.WELCOME) {

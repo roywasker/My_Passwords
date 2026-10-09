@@ -8,12 +8,12 @@ import com.example.core.model.CategoryChip
 import com.example.core.model.Credential
 import com.example.core.util.PasswordGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 data class AddPasswordUiState(
     val categories: List<CategoryChip> = emptyList(),
@@ -23,7 +23,8 @@ data class AddPasswordUiState(
     val password: CharArray = charArrayOf(),
     val isSaveEnabled: Boolean = false,
     val isSaved: Boolean = false,
-    val error: com.example.core.model.VaultError? = null
+    val isSaving: Boolean = false,
+    val error: com.example.core.model.VaultError? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -34,6 +35,7 @@ data class AddPasswordUiState(
         if (selectedCategoryId != other.selectedCategoryId) return false
         if (isSaveEnabled != other.isSaveEnabled) return false
         if (isSaved != other.isSaved) return false
+        if (isSaving != other.isSaving) return false
         if (error != other.error) return false
         if (categories != other.categories) return false
         if (platformName != other.platformName) return false
@@ -47,6 +49,7 @@ data class AddPasswordUiState(
         var result = selectedCategoryId
         result = 31 * result + isSaveEnabled.hashCode()
         result = 31 * result + isSaved.hashCode()
+        result = 31 * result + isSaving.hashCode()
         result = 31 * result + (error?.hashCode() ?: 0)
         result = 31 * result + categories.hashCode()
         result = 31 * result + platformName.hashCode()
@@ -57,9 +60,11 @@ data class AddPasswordUiState(
 }
 
 @HiltViewModel
-class AddPasswordViewModel @Inject constructor(
+class AddPasswordViewModel
+@Inject
+constructor(
     private val passwordRepository: PasswordRepository,
-    private val application: Application
+    private val application: Application,
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(AddPasswordUiState())
@@ -70,24 +75,52 @@ class AddPasswordViewModel @Inject constructor(
     }
 
     private fun loadCategories() {
-        val categories = passwordRepository.getCategories().map { category ->
-            CategoryChip(category.id, application.getString(category.nameResId))
-        }
+        val categories =
+            passwordRepository.getCategories().map { category ->
+                CategoryChip(category.id, application.getString(category.nameResId))
+            }
         _uiState.update { it.copy(categories = categories) }
     }
 
     fun onPlatformNameChanged(name: String) {
-        _uiState.update { it.copy(platformName = name, isSaveEnabled = validate(name, it.username, it.password)) }
+        if (_uiState.value.isSaving || _uiState.value.isSaved) return
+        _uiState.update {
+            it.copy(platformName = name, isSaveEnabled = validate(name, it.username, it.password))
+        }
     }
 
     fun onUsernameChanged(user: String) {
+        if (_uiState.value.isSaving || _uiState.value.isSaved) return
+        val previous = _uiState.value.username
         val userArray = user.toCharArray()
-        _uiState.update { it.copy(username = userArray, isSaveEnabled = validate(it.platformName, userArray, it.password)) }
+        if (previous.contentEquals(userArray)) {
+            userArray.fill(' ')
+            return
+        }
+        _uiState.update {
+            it.copy(
+                username = userArray,
+                isSaveEnabled = validate(it.platformName, userArray, it.password),
+            )
+        }
+        previous.fill(' ')
     }
 
     fun onPasswordChanged(pass: String) {
+        if (_uiState.value.isSaving || _uiState.value.isSaved) return
+        val previous = _uiState.value.password
         val passArray = pass.toCharArray()
-        _uiState.update { it.copy(password = passArray, isSaveEnabled = validate(it.platformName, it.username, passArray)) }
+        if (previous.contentEquals(passArray)) {
+            passArray.fill(' ')
+            return
+        }
+        _uiState.update {
+            it.copy(
+                password = passArray,
+                isSaveEnabled = validate(it.platformName, it.username, passArray),
+            )
+        }
+        previous.fill(' ')
     }
 
     fun onGeneratePasswordClicked() {
@@ -105,52 +138,91 @@ class AddPasswordViewModel @Inject constructor(
 
     fun onSaveClick() {
         val state = _uiState.value
-        if (state.isSaveEnabled) {
-            viewModelScope.launch {
+        if (
+            state.isSaveEnabled &&
+                !state.isSaving &&
+                !state.isSaved &&
+                validate(state.platformName, state.username, state.password)
+        ) {
+            val usernameBytes = String(state.username).toByteArray()
+            val passwordBytes = String(state.password).toByteArray()
+            _uiState.value = state.copy(isSaving = true, isSaveEnabled = false)
+            val job = viewModelScope.launch {
+                var credential: Credential? = null
                 try {
-                    val domain = state.platformName.trim().lowercase()
-                        .replace("\\s+".toRegex(), "") // Remove all spaces
-                        .replace("[^a-z0-9]".toRegex(), "") // Remove non-alphanumeric
-                    
-                    val iconUrl = if (domain.length >= 3) {
-                        "https://www.google.com/s2/favicons?domain=${domain}.com&sz=128"
-                    } else {
-                        ""
-                    }
-                    
+                    val domain =
+                        state.platformName
+                            .trim()
+                            .lowercase()
+                            .replace("\\s+".toRegex(), "") // Remove all spaces
+                            .replace("[^a-z0-9]".toRegex(), "") // Remove non-alphanumeric
+
+                    val iconUrl =
+                        if (domain.length >= 3) {
+                            "https://www.google.com/s2/favicons?domain=${domain}.com&sz=128"
+                        } else {
+                            ""
+                        }
+
                     // Convert CharArray to ByteArray for encryption
-                    val usernameBytes = String(state.username).toByteArray()
-                    val passwordBytes = String(state.password).toByteArray()
-                    
-                    val credential = Credential(
-                        platformName = state.platformName,
-                        username = usernameBytes,
-                        password = passwordBytes,
-                        website = iconUrl,
-                        categoryId = state.selectedCategoryId
-                    )
-                    
-                    passwordRepository.addPassword(credential)
-                    
+                    val submittedCredential =
+                        Credential(
+                            platformName = state.platformName,
+                            username = usernameBytes,
+                            password = passwordBytes,
+                            website = iconUrl,
+                            categoryId = state.selectedCategoryId,
+                        )
+
+                    credential = submittedCredential
+                    passwordRepository.addPassword(submittedCredential)
+
                     // Clear all sensitive data
-                    credential.clear()
+                    submittedCredential.clear()
                     usernameBytes.fill(0)
                     passwordBytes.fill(0)
                     state.username.fill(' ')
                     state.password.fill(' ')
-                    
-                    _uiState.update { it.copy(
-                        isSaved = true,
-                        username = charArrayOf(),
-                        password = charArrayOf(),
-                        error = null
-                    ) }
+
+                    _uiState.update {
+                        it.copy(
+                            isSaved = true,
+                            isSaving = false,
+                            isSaveEnabled = false,
+                            username = charArrayOf(),
+                            password = charArrayOf(),
+                            error = null,
+                        )
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
-                    val vaultError = if (e is com.example.core.model.VaultError) e else com.example.core.model.VaultError.GenericError(e)
-                    _uiState.update { it.copy(error = vaultError) }
+                    val vaultError =
+                        if (e is com.example.core.model.VaultError) e
+                        else com.example.core.model.VaultError.GenericError(e)
+                    _uiState.update {
+                        it.copy(
+                            error = vaultError,
+                            isSaving = false,
+                            isSaveEnabled = validate(it.platformName, it.username, it.password),
+                        )
+                    }
+                } finally {
+                    credential?.clear()
+                    usernameBytes.fill(0)
+                    passwordBytes.fill(0)
                 }
             }
+            job.invokeOnCompletion {
+                usernameBytes.fill(0)
+                passwordBytes.fill(0)
+            }
         }
+    }
+
+    override fun onCleared() {
+        _uiState.value.username.fill(' ')
+        _uiState.value.password.fill(' ')
     }
 
     fun clearError() {

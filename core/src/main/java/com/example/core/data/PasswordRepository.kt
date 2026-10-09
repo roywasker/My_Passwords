@@ -6,6 +6,8 @@ import com.example.core.model.Category
 import com.example.core.model.Credential
 import com.example.core.model.PasswordItemModel
 import com.example.core.model.VaultError
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -15,142 +17,180 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import javax.inject.Inject
-import javax.inject.Singleton
 
 @Singleton
-class PasswordRepository @Inject constructor(
+class PasswordRepository
+@Inject
+constructor(
     private val databaseManager: DatabaseManager,
-    private val cryptoManager: CryptoManager
+    private val cryptoManager: CryptoManager,
 ) {
-    
+
     fun getCategories(): List<Category> = Category.getAllCategories()
-    
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    val passwords: Flow<List<PasswordItemModel>> = databaseManager.isInitialized
-        .flatMapLatest { isInitialized: Boolean ->
-            if (isInitialized) {
-                val sessionKey = databaseManager.getSessionVaultKey()
-                databaseManager.getDatabase().credentialDao().getAllCredentials().map { entities ->
-                    entities.map { entity ->
-                        // Decrypt username for display
-                        val usernameBytes = cryptoManager.decryptWithKey(
-                            entity.encryptedUsername,
-                            entity.usernameIv,
-                            sessionKey
-                        )
-                        val username = String(usernameBytes)
-                        usernameBytes.fill(0) // Security: clear decrypted bytes
+    val passwords: Flow<List<PasswordItemModel>> =
+        databaseManager.isInitialized
+            .flatMapLatest { isInitialized: Boolean ->
+                if (isInitialized) {
+                    val sessionKey = databaseManager.getSessionVaultKey()
+                    databaseManager
+                        .getDatabase()
+                        .credentialDao()
+                        .getAllCredentials()
+                        .map { entities ->
+                            entities.map { entity ->
+                                // Decrypt username for display
+                                val usernameBytes =
+                                    cryptoManager.decryptWithKey(
+                                        entity.encryptedUsername,
+                                        entity.usernameIv,
+                                        sessionKey,
+                                    )
+                                val username = String(usernameBytes)
+                                usernameBytes.fill(0) // Security: clear decrypted bytes
 
-                        PasswordItemModel(
-                            id = entity.id,
-                            platform = entity.platformName,
-                            userName = username,
-                            website = entity.website,
-                            categoryId = entity.categoryId
-                        )
-                    }
-                }.flowOn(Dispatchers.IO)
-            } else {
-                flowOf<List<PasswordItemModel>>(emptyList())
+                                PasswordItemModel(
+                                    id = entity.id,
+                                    platform = entity.platformName,
+                                    userName = username,
+                                    website = entity.website,
+                                    categoryId = entity.categoryId,
+                                )
+                            }
+                        }
+                        .flowOn(Dispatchers.IO)
+                } else {
+                    flowOf<List<PasswordItemModel>>(emptyList())
+                }
             }
-        }.catch { e: Throwable ->
-            if (e is VaultError) throw e
-            throw VaultError.DatabaseError(e)
+            .catch { e: Throwable ->
+                if (e is VaultError) throw e
+                throw VaultError.DatabaseError(e)
+            }
+
+    suspend fun addPassword(credential: Credential) =
+        withContext(Dispatchers.IO) {
+            try {
+                val sessionKey = databaseManager.getSessionVaultKey()
+
+                val (encryptedUsername, usernameIv) =
+                    cryptoManager.encryptWithKey(credential.username, sessionKey)
+                val (encryptedPassword, passwordIv) =
+                    cryptoManager.encryptWithKey(credential.password, sessionKey)
+
+                val entity =
+                    EncryptedCredentialEntity(
+                        platformName = credential.platformName,
+                        encryptedUsername = encryptedUsername,
+                        usernameIv = usernameIv,
+                        encryptedPassword = encryptedPassword,
+                        passwordIv = passwordIv,
+                        website = credential.website,
+                        categoryId = credential.categoryId,
+                    )
+
+                databaseManager.getDatabase().credentialDao().insertCredential(entity)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e is VaultError) throw e
+                throw VaultError.DatabaseError(e)
+            } finally {
+                // Security: clear sensitive data
+                credential.clear()
+            }
         }
 
-    suspend fun addPassword(credential: Credential) = withContext(Dispatchers.IO) {
-        try {
-            val sessionKey = databaseManager.getSessionVaultKey()
-            
-            val (encryptedUsername, usernameIv) = cryptoManager.encryptWithKey(credential.username, sessionKey)
-            val (encryptedPassword, passwordIv) = cryptoManager.encryptWithKey(credential.password, sessionKey)
+    suspend fun getDecryptedCredential(id: Int): com.example.core.model.FullCredentialModel? =
+        withContext(Dispatchers.IO) {
+            try {
+                if (!databaseManager.isDatabaseInitialized()) return@withContext null
 
-            val entity = EncryptedCredentialEntity(
-                platformName = credential.platformName,
-                encryptedUsername = encryptedUsername,
-                usernameIv = usernameIv,
-                encryptedPassword = encryptedPassword,
-                passwordIv = passwordIv,
-                website = credential.website,
-                categoryId = credential.categoryId
-            )
+                val sessionKey = databaseManager.getSessionVaultKey()
+                val entity =
+                    databaseManager.getDatabase().credentialDao().getCredentialById(id)
+                        ?: return@withContext null
 
-            databaseManager.getDatabase().credentialDao().insertCredential(entity)
-        } catch (e: Exception) {
-            if (e is VaultError) throw e
-            throw VaultError.DatabaseError(e)
-        } finally {
-            // Security: clear sensitive data
-            credential.clear()
+                // Decrypt username
+                val usernameBytes =
+                    cryptoManager.decryptWithKey(
+                        entity.encryptedUsername,
+                        entity.usernameIv,
+                        sessionKey,
+                    )
+                val username = String(usernameBytes).toCharArray()
+                usernameBytes.fill(0)
+
+                // Decrypt password
+                val passwordBytes =
+                    cryptoManager.decryptWithKey(
+                        entity.encryptedPassword,
+                        entity.passwordIv,
+                        sessionKey,
+                    )
+                val password = String(passwordBytes).toCharArray()
+                passwordBytes.fill(0)
+
+                com.example.core.model.FullCredentialModel(
+                    id = entity.id,
+                    platform = entity.platformName,
+                    username = username,
+                    password = password,
+                    website = entity.website,
+                    categoryId = entity.categoryId,
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e is VaultError) throw e
+                throw VaultError.DatabaseError(e)
+            }
         }
-    }
 
-    suspend fun getDecryptedCredential(id: Int): com.example.core.model.FullCredentialModel? = withContext(Dispatchers.IO) {
-        try {
-            if (!databaseManager.isDatabaseInitialized()) return@withContext null
-            
-            val sessionKey = databaseManager.getSessionVaultKey()
-            val entity = databaseManager.getDatabase().credentialDao().getCredentialById(id) ?: return@withContext null
-            
-            // Decrypt username
-            val usernameBytes = cryptoManager.decryptWithKey(entity.encryptedUsername, entity.usernameIv, sessionKey)
-            val username = String(usernameBytes).toCharArray()
-            usernameBytes.fill(0)
-            
-            // Decrypt password
-            val passwordBytes = cryptoManager.decryptWithKey(entity.encryptedPassword, entity.passwordIv, sessionKey)
-            val password = String(passwordBytes).toCharArray()
-            passwordBytes.fill(0)
-            
-            com.example.core.model.FullCredentialModel(
-                id = entity.id,
-                platform = entity.platformName,
-                username = username,
-                password = password,
-                website = entity.website,
-                categoryId = entity.categoryId
-            )
-        } catch (e: Exception) {
-            if (e is VaultError) throw e
-            throw VaultError.DatabaseError(e)
+    suspend fun updatePassword(id: Int, credential: Credential) =
+        withContext(Dispatchers.IO) {
+            try {
+                val sessionKey = databaseManager.getSessionVaultKey()
+
+                val (encryptedUsername, usernameIv) =
+                    cryptoManager.encryptWithKey(credential.username, sessionKey)
+                val (encryptedPassword, passwordIv) =
+                    cryptoManager.encryptWithKey(credential.password, sessionKey)
+
+                val entity =
+                    EncryptedCredentialEntity(
+                        id = id,
+                        platformName = credential.platformName,
+                        encryptedUsername = encryptedUsername,
+                        usernameIv = usernameIv,
+                        encryptedPassword = encryptedPassword,
+                        passwordIv = passwordIv,
+                        website = credential.website,
+                        categoryId = credential.categoryId,
+                    )
+
+                databaseManager.getDatabase().credentialDao().insertCredential(entity)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e is VaultError) throw e
+                throw VaultError.DatabaseError(e)
+            } finally {
+                // Security: clear sensitive data
+                credential.clear()
+            }
         }
-    }
 
-    suspend fun updatePassword(id: Int, credential: Credential) = withContext(Dispatchers.IO) {
-        try {
-            val sessionKey = databaseManager.getSessionVaultKey()
-            
-            val (encryptedUsername, usernameIv) = cryptoManager.encryptWithKey(credential.username, sessionKey)
-            val (encryptedPassword, passwordIv) = cryptoManager.encryptWithKey(credential.password, sessionKey)
-
-            val entity = EncryptedCredentialEntity(
-                id = id,
-                platformName = credential.platformName,
-                encryptedUsername = encryptedUsername,
-                usernameIv = usernameIv,
-                encryptedPassword = encryptedPassword,
-                passwordIv = passwordIv,
-                website = credential.website,
-                categoryId = credential.categoryId
-            )
-
-            databaseManager.getDatabase().credentialDao().insertCredential(entity)
-        } catch (e: Exception) {
-            if (e is VaultError) throw e
-            throw VaultError.DatabaseError(e)
-        } finally {
-            // Security: clear sensitive data
-            credential.clear()
+    suspend fun deletePassword(id: Int) =
+        withContext(Dispatchers.IO) {
+            try {
+                databaseManager.getDatabase().credentialDao().deleteCredential(id)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e is VaultError) throw e
+                throw VaultError.DatabaseError(e)
+            }
         }
-    }
-
-    suspend fun deletePassword(id: Int) = withContext(Dispatchers.IO) {
-        try {
-            databaseManager.getDatabase().credentialDao().deleteCredential(id)
-        } catch (e: Exception) {
-            if (e is VaultError) throw e
-            throw VaultError.DatabaseError(e)
-        }
-    }
 }
