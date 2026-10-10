@@ -28,12 +28,12 @@ class CryptoManager @Inject constructor() {
         generateMasterKey()
     }
 
-    private fun generateMasterKey() {
-        if (!keyStore.containsAlias(keyAlias)) {
+    private fun generateMasterKey(alias: String = keyAlias) {
+        if (!keyStore.containsAlias(alias)) {
             val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, provider)
             val spec =
                 KeyGenParameterSpec.Builder(
-                        keyAlias,
+                        alias,
                         KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
                     )
                     .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
@@ -50,6 +50,34 @@ class CryptoManager @Inject constructor() {
 
     private fun getSecretKey(): SecretKey =
         (keyStore.getEntry(keyAlias, null) as KeyStore.SecretKeyEntry).secretKey
+
+    fun getMasterEncryptionCipher(alias: String): Cipher {
+        generateMasterKey(alias)
+        return Cipher.getInstance(transformation).apply {
+            init(
+                Cipher.ENCRYPT_MODE,
+                (keyStore.getEntry(alias, null) as KeyStore.SecretKeyEntry).secretKey,
+            )
+        }
+    }
+
+    fun getMasterDecryptionCipher(iv: ByteArray, alias: String): Cipher =
+        Cipher.getInstance(transformation).apply {
+            init(
+                Cipher.DECRYPT_MODE,
+                (keyStore.getEntry(alias, null) as KeyStore.SecretKeyEntry).secretKey,
+                GCMParameterSpec(tagLength, iv),
+            )
+        }
+
+    /**
+     * Replaces only the inactive slot, retaining the active biometric key until recovery commits.
+     */
+    fun prepareRecoveryCipher(alias: String): Cipher {
+        require(alias == "VaultMasterKey" || alias == "VaultRecoveryMasterKey")
+        if (keyStore.containsAlias(alias)) keyStore.deleteEntry(alias)
+        return getMasterEncryptionCipher(alias)
+    }
 
     /** Used ONLY for wrapping/unwrapping the Vault Key via Biometrics. */
     fun getMasterEncryptionCipher(): Cipher {

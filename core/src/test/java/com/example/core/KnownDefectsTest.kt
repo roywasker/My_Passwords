@@ -35,6 +35,7 @@ class KnownDefectsTest {
             val manager = io.mockk.mockk<com.example.core.data.DatabaseManager>()
             val crypto = io.mockk.mockk<com.example.core.crypto.CryptoManager>()
             val key = ByteArray(32)
+            io.mockk.every { manager.session } returns com.example.core.auth.VaultSession()
             io.mockk.every { manager.isInitialized } returns
                 kotlinx.coroutines.flow.MutableStateFlow(true)
             io.mockk.every { manager.getSessionVaultKey() } returns key

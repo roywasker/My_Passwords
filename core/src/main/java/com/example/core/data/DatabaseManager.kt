@@ -3,7 +3,6 @@ package com.example.core.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
-import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.core.crypto.CryptoManager
@@ -12,7 +11,7 @@ import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.ensureActive
 
 @Singleton
 class DatabaseManager
@@ -20,11 +19,18 @@ class DatabaseManager
 constructor(
     @param:ApplicationContext private val context: Context,
     private val cryptoManager: CryptoManager,
+    private val recoveryCodec: com.example.core.crypto.VaultRecoveryCodec =
+        com.example.core.crypto.VaultRecoveryCodec(),
+    val session: com.example.core.auth.VaultSession = com.example.core.auth.VaultSession(),
 ) {
-    private var database: VaultDatabase? = null
+    private val sessionLock
+        get() = session.stateLock
 
-    // Security: The DPK (Data Protection Key) stored in memory after biometric unwrap
-    private var sessionVaultKey: ByteArray? = null
+    private val openingMutex
+        get() = session.openingMutex
+
+    private val generation
+        get() = session.generation
 
     private val sharedPrefs: SharedPreferences by lazy {
         val masterKey =
@@ -44,21 +50,14 @@ constructor(
     private val PASSPHRASE_KEY = "encrypted_db_passphrase"
     private val PASSPHRASE_IV_KEY = "db_passphrase_iv"
 
-    private val _isInitialized = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val isInitialized = _isInitialized.asStateFlow()
+    val isInitialized
+        get() = session.isInitialized
 
-    fun isDatabaseInitialized(): Boolean = _isInitialized.value
+    fun isDatabaseInitialized(): Boolean = isInitialized.value
 
-    fun getDatabase(): VaultDatabase {
-        if (!_isInitialized.value) throw com.example.core.model.VaultError.UninitializedVault
-        return database ?: throw com.example.core.model.VaultError.UninitializedVault
-    }
+    fun getDatabase(): VaultDatabase = session.getDatabase()
 
-    /** Security: Returns the in-memory Vault Key for field-level encryption. */
-    fun getSessionVaultKey(): ByteArray {
-        if (!_isInitialized.value) throw com.example.core.model.VaultError.UninitializedVault
-        return sessionVaultKey ?: throw com.example.core.model.VaultError.UninitializedVault
-    }
+    fun getSessionVaultKey(): ByteArray = session.getKey()
 
     /** Prepares the cipher to either encrypt a new passphrase or decrypt the existing one. */
     fun getPassphraseCipher(): Cipher {
@@ -71,90 +70,250 @@ constructor(
                     sharedPrefs.getString(PASSPHRASE_IV_KEY, null)
                         ?: throw IllegalStateException("IV missing for encrypted passphrase")
                 val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
-                cryptoManager.getMasterDecryptionCipher(iv)
+                val alias = sharedPrefs.getString("biometric_key_alias", null)
+                if (alias == null) cryptoManager.getMasterDecryptionCipher(iv)
+                else cryptoManager.getMasterDecryptionCipher(iv, alias)
             }
         } catch (e: Exception) {
             throw com.example.core.model.VaultError.GenericError(e)
         }
     }
 
-    suspend fun initializeDatabase(authenticatedCipher: Cipher) =
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            var passphrase: ByteArray? = null
-            try {
-                val encryptedPassphrase = sharedPrefs.getString(PASSPHRASE_KEY, null)
-                passphrase =
-                    if (encryptedPassphrase == null) {
-                        val generated = ByteArray(32).apply { SecureRandom().nextBytes(this) }
-                        try {
-                            val wrappingInput = generated.copyOf()
-                            val (encrypted, iv) =
-                                try {
-                                    cryptoManager.wrapKey(wrappingInput, authenticatedCipher)
-                                } finally {
-                                    wrappingInput.fill(0)
-                                }
-                            sharedPrefs.edit {
-                                putString(PASSPHRASE_KEY, encrypted)
-                                putString(PASSPHRASE_IV_KEY, iv)
-                            }
-                            generated
-                        } catch (e: Exception) {
-                            generated.fill(0)
-                            throw e
-                        }
-                    } else {
-                        cryptoManager.unwrapKey(encryptedPassphrase, authenticatedCipher)
-                    }
-
-                clearSession()
-                var opened = VaultDatabase.build(context, passphrase)
+    suspend fun initializeDatabase(authenticatedCipher: Cipher) {
+        val ticket = synchronized(sessionLock) { generation }
+        openingMutex.lock()
+        try {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                checkTicket(ticket)
+                var passphrase: ByteArray? = null
+                var opened: VaultDatabase? = null
                 try {
-                    // Open SQLCipher before wiping the passphrase or publishing an unlocked
-                    // session.
+                    val encryptedPassphrase = sharedPrefs.getString(PASSPHRASE_KEY, null)
+                    passphrase =
+                        if (encryptedPassphrase == null) {
+                            check(
+                                !context.getDatabasePath("vault.db").let {
+                                    it.isFile && it.length() > 0
+                                }
+                            ) {
+                                "Existing vault has no stored wrapping key; refusing to overwrite it"
+                            }
+                            val generated = ByteArray(32).apply { SecureRandom().nextBytes(this) }
+                            try {
+                                val input = generated.copyOf()
+                                val wrapped =
+                                    try {
+                                        cryptoManager.wrapKey(input, authenticatedCipher)
+                                    } finally {
+                                        input.fill(0)
+                                    }
+                                checkTicket(ticket)
+                                check(
+                                    sharedPrefs
+                                        .edit()
+                                        .putString(PASSPHRASE_KEY, wrapped.first)
+                                        .putString(PASSPHRASE_IV_KEY, wrapped.second)
+                                        .commit()
+                                ) {
+                                    "Could not persist vault wrapping key"
+                                }
+                                generated
+                            } catch (error: Exception) {
+                                generated.fill(0)
+                                throw error
+                            }
+                        } else cryptoManager.unwrapKey(encryptedPassphrase, authenticatedCipher)
+                    checkTicket(ticket)
+                    closeCurrentSession(ticket)
+                    opened = openValidated(passphrase, encryptedPassphrase != null)
+                    opened
+                        .credentialDao()
+                        .purgeExpiredTrash(
+                            com.example.core.model.TrashPolicy.cutoff(System.currentTimeMillis())
+                        )
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    publish(ticket, opened, passphrase)
+                    opened = null // Ownership transferred to the session.
+                } catch (error: kotlinx.coroutines.CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    throw com.example.core.model.VaultError.DatabaseError(error)
+                } finally {
                     try {
-                        opened.openHelper.writableDatabase
-                    } catch (error: net.zetetic.database.sqlcipher.SQLiteNotADatabaseException) {
-                        // Older releases wiped the key before Room's lazy first open, creating
-                        // databases encrypted with 32 zero bytes. Never reset or delete a vault.
-                        if (encryptedPassphrase == null) throw error
-                        opened.close()
-                        try {
-                            VaultDatabase.recoverLegacyZeroKey(context, passphrase)
-                        } catch (recoveryError: Exception) {
-                            error.addSuppressed(recoveryError)
-                            throw error
-                        }
-                        opened = VaultDatabase.build(context, passphrase)
-                        opened.openHelper.writableDatabase
+                        opened?.close()
+                    } finally {
+                        passphrase?.fill(0)
                     }
-                    database = opened
-                    sessionVaultKey = passphrase.copyOf()
-                    _isInitialized.value = true
-                } catch (e: Exception) {
-                    try {
-                        opened.close()
-                    } catch (closeError: Exception) {
-                        e.addSuppressed(closeError)
-                    }
-                    throw e
                 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                throw com.example.core.model.VaultError.DatabaseError(e)
+            }
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            clearCancelledSession(ticket)
+            throw error
+        } finally {
+            openingMutex.unlock()
+        }
+    }
+
+    private fun checkTicket(ticket: Long) = session.checkTicket(ticket)
+
+    private fun closeCurrentSession(ticket: Long) = session.closeForReopen(ticket)
+
+    private fun publish(ticket: Long, opened: VaultDatabase, passphrase: ByteArray) =
+        session.publish(ticket, opened, passphrase)
+
+    private fun openValidated(passphrase: ByteArray, allowLegacy: Boolean): VaultDatabase {
+        var opened = VaultDatabase.build(context, passphrase)
+        try {
+            try {
+                opened.openHelper.writableDatabase
+            } catch (error: net.zetetic.database.sqlcipher.SQLiteNotADatabaseException) {
+                if (!allowLegacy) throw error
+                opened.close()
+                try {
+                    VaultDatabase.recoverLegacyZeroKey(context, passphrase)
+                } catch (recoveryError: Exception) {
+                    error.addSuppressed(recoveryError)
+                    throw error
+                }
+                opened = VaultDatabase.build(context, passphrase)
+                opened.openHelper.writableDatabase
+            }
+            return opened
+        } catch (error: Exception) {
+            try {
+                opened.close()
+            } catch (closeError: Exception) {
+                error.addSuppressed(closeError)
+            }
+            throw error
+        }
+    }
+
+    private fun clearCancelledSession(ticket: Long) = session.lockIfCurrent(ticket)
+
+    fun clearSession() = session.lock()
+
+    suspend fun createRecoveryCode(): String =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val ticket = synchronized(sessionLock) { generation }
+            val key = synchronized(sessionLock) { getSessionVaultKey().copyOf() }
+            try {
+                val envelope = recoveryCodec.protect(key)
+                synchronized(sessionLock) {
+                    checkTicket(ticket)
+                    check(
+                        sharedPrefs
+                            .edit()
+                            .putString("recovery_ciphertext", envelope.ciphertext)
+                            .putString("recovery_iv", envelope.iv)
+                            .commit()
+                    ) {
+                        "Could not persist recovery envelope"
+                    }
+                }
+                envelope.code
             } finally {
-                passphrase?.fill(0)
+                key.fill(0)
             }
         }
 
-    fun clearSession() {
-        val previousDatabase = database
-        // Revoke access and wipe memory even if the database fails to close.
-        database = null
-        sessionVaultKey?.fill(0)
-        sessionVaultKey = null
-        _isInitialized.value = false
-        previousDatabase?.close()
+    class RecoveryAttempt
+    internal constructor(
+        internal val key: ByteArray,
+        val cipher: Cipher,
+        internal val alias: String,
+        internal val ticket: Long,
+    ) {
+        fun clear() {
+            key.fill(0)
+        }
+
+        override fun toString() = "RecoveryAttempt([redacted])"
+    }
+
+    suspend fun prepareRecovery(code: String): RecoveryAttempt {
+        var prepared: RecoveryAttempt? = null
+        try {
+            return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val ticket = synchronized(sessionLock) { generation }
+                val encrypted =
+                    sharedPrefs.getString("recovery_ciphertext", null)
+                        ?: error("No recovery code configured")
+                val iv = sharedPrefs.getString("recovery_iv", null) ?: error("Missing recovery IV")
+                val key = recoveryCodec.recover(code, encrypted, iv)
+                try {
+                    checkTicket(ticket)
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    val active = sharedPrefs.getString("biometric_key_alias", "VaultMasterKey")
+                    val alias =
+                        if (active == "VaultMasterKey") "VaultRecoveryMasterKey"
+                        else "VaultMasterKey"
+                    RecoveryAttempt(key, cryptoManager.prepareRecoveryCipher(alias), alias, ticket)
+                        .also { prepared = it }
+                } catch (error: Exception) {
+                    key.fill(0)
+                    throw error
+                }
+            }
+        } catch (error: Exception) {
+            prepared?.clear()
+            throw error
+        }
+    }
+
+    suspend fun completeRecovery(attempt: RecoveryAttempt, authenticatedCipher: Cipher) {
+        var acquired = false
+        try {
+            openingMutex.lock()
+            acquired = true
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                var opened: VaultDatabase? = null
+                try {
+                    checkTicket(attempt.ticket)
+                    closeCurrentSession(attempt.ticket)
+                    opened = openValidated(attempt.key, true)
+                    opened
+                        .credentialDao()
+                        .purgeExpiredTrash(
+                            com.example.core.model.TrashPolicy.cutoff(System.currentTimeMillis())
+                        )
+                    val input = attempt.key.copyOf()
+                    val wrapped =
+                        try {
+                            cryptoManager.wrapKey(input, authenticatedCipher)
+                        } finally {
+                            input.fill(0)
+                        }
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    synchronized(sessionLock) {
+                        checkTicket(attempt.ticket)
+                        check(
+                            sharedPrefs
+                                .edit()
+                                .putString(PASSPHRASE_KEY, wrapped.first)
+                                .putString(PASSPHRASE_IV_KEY, wrapped.second)
+                                .putString("biometric_key_alias", attempt.alias)
+                                .commit()
+                        ) {
+                            "Could not persist recovered wrapping key"
+                        }
+                        publish(attempt.ticket, opened, attempt.key)
+                        opened = null
+                    }
+                } finally {
+                    try {
+                        opened?.close()
+                    } finally {
+                        attempt.clear()
+                    }
+                }
+            }
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            clearCancelledSession(attempt.ticket)
+            throw error
+        } finally {
+            if (acquired) openingMutex.unlock()
+            attempt.clear()
+        }
     }
 }

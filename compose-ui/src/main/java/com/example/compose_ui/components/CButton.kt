@@ -4,12 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
@@ -33,28 +30,25 @@ fun CButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    buttonShape: RoundedCornerShape = RoundedCornerShape(12.dp),
-    buttonColor: ButtonColors = ButtonDefaults.buttonColors(
-        containerColor = Color(0xFF1D4ED8)
-    ),
+    buttonShape: RoundedCornerShape = RoundedCornerShape(20.dp),
+    buttonColor: ButtonColors = ButtonDefaults.buttonColors(containerColor = Color(0xFF245ACB)),
     textColor: Color = Color.White,
     textFontSize: TextUnit = 18.sp,
     icon: ImageVector? = null,
     iconSize: Dp = 24.dp,
-    textFontWeight: FontWeight = FontWeight.Bold
+    textFontWeight: FontWeight = FontWeight.Bold,
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         enabled = enabled,
         colors = buttonColor,
-        shape = buttonShape
+        shape = buttonShape,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.Center,
         ) {
             if (icon != null) {
                 Icon(
@@ -70,7 +64,7 @@ fun CButton(
                 text = text,
                 color = textColor,
                 fontSize = textFontSize,
-                fontWeight = textFontWeight
+                fontWeight = textFontWeight,
             )
         }
     }
@@ -81,6 +75,6 @@ fun CButton(
 fun CButtonPreview() {
     CButton(
         text = "Login",
-        onClick = {}
+        onClick = {},
     )
 }

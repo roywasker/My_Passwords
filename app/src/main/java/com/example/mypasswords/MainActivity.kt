@@ -10,8 +10,8 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.DefaultNavTransitions
+import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.core.auth.AuthRepository
@@ -38,7 +38,12 @@ class MainActivity : AppCompatActivity() {
             WindowManager.LayoutParams.FLAG_SECURE,
         )
 
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle =
+                androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle =
+                androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
 
         setContent {
             MyPasswordsTheme {
@@ -64,15 +69,17 @@ class MainActivity : AppCompatActivity() {
                     enterTransition = {
                         if (
                             initialState.destination.route == Routes.FINGERPRINT_AUTH &&
-                            targetState.destination.route == Routes.PASSWORD
-                        ) EnterTransition.None
+                                targetState.destination.route == Routes.PASSWORD
+                        )
+                            EnterTransition.None
                         else DefaultNavTransitions.enterTransition.invoke(this)
                     },
                     exitTransition = {
                         if (
                             initialState.destination.route == Routes.FINGERPRINT_AUTH &&
-                            targetState.destination.route == Routes.PASSWORD
-                        ) ExitTransition.None
+                                targetState.destination.route == Routes.PASSWORD
+                        )
+                            ExitTransition.None
                         else DefaultNavTransitions.exitTransition.invoke(this)
                     },
                 ) {
@@ -136,6 +143,22 @@ class MainActivity : AppCompatActivity() {
         // Security: Lock the app when it goes to background, but not on rotation
         if (!isChangingConfigurations) {
             authRepository.setAuthenticated(false)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        com.example.compose_ui.components
+            .SensitiveClipboardCleaner(applicationContext)
+            .clearExpired()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            com.example.compose_ui.components
+                .SensitiveClipboardCleaner(applicationContext)
+                .clearExpired()
         }
     }
 }

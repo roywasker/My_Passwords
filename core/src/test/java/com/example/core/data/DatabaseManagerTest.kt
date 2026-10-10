@@ -18,6 +18,7 @@ import org.robolectric.annotation.Config
 @RunWith(org.robolectric.RobolectricTestRunner::class)
 @Config(sdk = [28], application = Application::class)
 class DatabaseManagerTest {
+    @get:Rule val hostCrypto = com.example.core.testing.HostCryptoProviderRule()
     private lateinit var context: Context
     private lateinit var prefs: SharedPreferences
     private lateinit var manager: DatabaseManager
@@ -72,6 +73,25 @@ class DatabaseManagerTest {
         verify(exactly = 1) { crypto.getMasterEncryptionCipher() }
         verify(exactly = 0) { crypto.getMasterDecryptionCipher(any()) }
     }
+
+    @Test
+    fun openingVaultAutomaticallyPurgesOnlyExpiredTrash() =
+        runBlocking<Unit> {
+            val before = System.currentTimeMillis()
+            manager.initializeDatabase(cipher)
+            coVerify(exactly = 1) {
+                db.credentialDao()
+                    .purgeExpiredTrash(
+                        match {
+                            it >= com.example.core.model.TrashPolicy.cutoff(before) &&
+                                it <=
+                                    com.example.core.model.TrashPolicy.cutoff(
+                                        System.currentTimeMillis()
+                                    )
+                        }
+                    )
+            }
+        }
 
     @Test
     fun returningUserUsesStoredIvForDecryptionCipher() {
@@ -287,51 +307,254 @@ class DatabaseManagerTest {
         }
 
     @Test
-    fun existingLegacyVaultIsRecoveredAndReopenedWithAuthenticatedKey() = runBlocking<Unit> {
-        stored()
-        val key = ByteArray(32) { 7 }
-        coEvery { crypto.unwrapKey("stored-key", cipher) } returns key
-        every { db.openHelper.writableDatabase } throws
-            net.zetetic.database.sqlcipher.SQLiteNotADatabaseException("synthetic legacy key") andThen
-            mockk<androidx.sqlite.db.SupportSQLiteDatabase>(relaxed = true)
-        every { VaultDatabase.recoverLegacyZeroKey(context, any()) } just Runs
-        manager.initializeDatabase(cipher)
-        assertTrue(manager.isDatabaseInitialized())
-        assertTrue(manager.getSessionVaultKey().all { it == 7.toByte() })
-        assertTrue(key.all { it == 0.toByte() })
-        verify(exactly = 1) { VaultDatabase.recoverLegacyZeroKey(context, any()) }
-        verify(exactly = 2) { VaultDatabase.build(context, any()) }
-    }
+    fun existingLegacyVaultIsRecoveredAndReopenedWithAuthenticatedKey() =
+        runBlocking<Unit> {
+            stored()
+            val key = ByteArray(32) { 7 }
+            coEvery { crypto.unwrapKey("stored-key", cipher) } returns key
+            every { db.openHelper.writableDatabase } throws
+                net.zetetic.database.sqlcipher.SQLiteNotADatabaseException(
+                    "synthetic legacy key"
+                ) andThen
+                mockk<androidx.sqlite.db.SupportSQLiteDatabase>(relaxed = true)
+            every { VaultDatabase.recoverLegacyZeroKey(context, any()) } just Runs
+            manager.initializeDatabase(cipher)
+            assertTrue(manager.isDatabaseInitialized())
+            assertTrue(manager.getSessionVaultKey().all { it == 7.toByte() })
+            assertTrue(key.all { it == 0.toByte() })
+            verify(exactly = 1) { VaultDatabase.recoverLegacyZeroKey(context, any()) }
+            verify(exactly = 2) { VaultDatabase.build(context, any()) }
+        }
 
     @Test
-    fun failedLegacyRecoveryPreservesOriginalCauseAndDoesNotPublishSession() = runBlocking<Unit> {
-        stored()
-        coEvery { crypto.unwrapKey("stored-key", cipher) } returns ByteArray(32) { 7 }
-        val original = net.zetetic.database.sqlcipher.SQLiteNotADatabaseException("synthetic wrong key")
-        val recovery = IllegalStateException("synthetic unrecoverable vault")
-        every { db.openHelper.writableDatabase } throws original
-        every { VaultDatabase.recoverLegacyZeroKey(context, any()) } throws recovery
-        try {
-            manager.initializeDatabase(cipher)
-            fail("Expected failed recovery")
-        } catch (error: VaultError.DatabaseError) {
-            assertSame(original, error.cause)
-            assertTrue(original.suppressed.contains(recovery))
+    fun failedLegacyRecoveryPreservesOriginalCauseAndDoesNotPublishSession() =
+        runBlocking<Unit> {
+            stored()
+            coEvery { crypto.unwrapKey("stored-key", cipher) } returns ByteArray(32) { 7 }
+            val original =
+                net.zetetic.database.sqlcipher.SQLiteNotADatabaseException("synthetic wrong key")
+            val recovery = IllegalStateException("synthetic unrecoverable vault")
+            every { db.openHelper.writableDatabase } throws original
+            every { VaultDatabase.recoverLegacyZeroKey(context, any()) } throws recovery
+            try {
+                manager.initializeDatabase(cipher)
+                fail("Expected failed recovery")
+            } catch (error: VaultError.DatabaseError) {
+                assertSame(original, error.cause)
+                assertTrue(original.suppressed.contains(recovery))
+            }
+            assertFalse(manager.isDatabaseInitialized())
+            assertEquals("stored-key", prefs.getString("encrypted_db_passphrase", null))
         }
-        assertFalse(manager.isDatabaseInitialized())
-        assertEquals("stored-key", prefs.getString("encrypted_db_passphrase", null))
-    }
 
     @Test
-    fun firstUseNeverAttemptsLegacyRecovery() = runBlocking<Unit> {
-        every { db.openHelper.writableDatabase } throws
-            net.zetetic.database.sqlcipher.SQLiteNotADatabaseException("synthetic orphan vault")
-        try {
-            manager.initializeDatabase(cipher)
-            fail("Expected failed open")
-        } catch (error: VaultError.DatabaseError) {
-            assertTrue(error.cause is net.zetetic.database.sqlcipher.SQLiteNotADatabaseException)
+    fun firstUseNeverAttemptsLegacyRecovery() =
+        runBlocking<Unit> {
+            every { db.openHelper.writableDatabase } throws
+                net.zetetic.database.sqlcipher.SQLiteNotADatabaseException("synthetic orphan vault")
+            try {
+                manager.initializeDatabase(cipher)
+                fail("Expected failed open")
+            } catch (error: VaultError.DatabaseError) {
+                assertTrue(
+                    error.cause is net.zetetic.database.sqlcipher.SQLiteNotADatabaseException
+                )
+            }
+            verify(exactly = 0) { VaultDatabase.recoverLegacyZeroKey(any(), any()) }
         }
-        verify(exactly = 0) { VaultDatabase.recoverLegacyZeroKey(any(), any()) }
-    }
+
+    @Test
+    fun lockingDuringDatabaseOpenRejectsLateSessionAndClosesHandle() =
+        runBlocking<Unit> {
+            every { db.openHelper.writableDatabase } answers
+                {
+                    manager.clearSession()
+                    mockk<androidx.sqlite.db.SupportSQLiteDatabase>(relaxed = true)
+                }
+            try {
+                manager.initializeDatabase(cipher)
+                fail("Expected revoked session")
+            } catch (_: kotlinx.coroutines.CancellationException) {}
+            assertFalse(manager.isDatabaseInitialized())
+            assertThrows(VaultError.UninitializedVault::class.java) { manager.getSessionVaultKey() }
+            verify(exactly = 1) { db.close() }
+        }
+
+    @Test
+    fun lockingWhileUnwrappingRejectsLateKeyAndWipesIt() =
+        runBlocking<Unit> {
+            stored()
+            val key = ByteArray(32) { 7 }
+            coEvery { crypto.unwrapKey(any(), any()) } coAnswers
+                {
+                    manager.clearSession()
+                    key
+                }
+            try {
+                manager.initializeDatabase(cipher)
+                fail("Expected revoked session")
+            } catch (_: kotlinx.coroutines.CancellationException) {}
+            assertTrue(key.all { it == 0.toByte() })
+            verify(exactly = 0) { VaultDatabase.build(any(), any()) }
+            assertFalse(manager.isDatabaseInitialized())
+        }
+
+    @Test
+    fun failedWrappingKeyCommitDoesNotCreateDatabaseOrUnlock() =
+        runBlocking<Unit> {
+            val fakePrefs = mockk<SharedPreferences>()
+            val editor = mockk<SharedPreferences.Editor>()
+            every { fakePrefs.getString(any(), any()) } returns null
+            every { fakePrefs.edit() } returns editor
+            every { editor.putString(any(), any()) } returns editor
+            every { editor.commit() } returns false
+            DatabaseManager::class
+                .java
+                .getDeclaredField("sharedPrefs\$delegate")
+                .apply { isAccessible = true }
+                .set(manager, lazyOf(fakePrefs))
+            try {
+                manager.initializeDatabase(cipher)
+                fail("Expected persistence failure")
+            } catch (error: VaultError.DatabaseError) {
+                assertTrue(error.cause is IllegalStateException)
+            }
+            verify(exactly = 0) { editor.apply() }
+            verify(exactly = 0) { VaultDatabase.build(any(), any()) }
+            assertFalse(manager.isDatabaseInitialized())
+        }
+
+    @Test
+    fun existingFileWithoutWrappingKeyIsNotOverwrittenOrAssignedANewKey() =
+        runBlocking<Unit> {
+            val file = context.getDatabasePath("vault.db")
+            file.parentFile!!.mkdirs()
+            file.writeText("synthetic existing vault")
+            try {
+                try {
+                    manager.initializeDatabase(cipher)
+                    fail("Expected missing key refusal")
+                } catch (_: VaultError.DatabaseError) {}
+                assertEquals("synthetic existing vault", file.readText())
+                assertFalse(prefs.contains("encrypted_db_passphrase"))
+                coVerify(exactly = 0) { crypto.wrapKey(any(), any()) }
+                verify(exactly = 0) { VaultDatabase.build(any(), any()) }
+            } finally {
+                context.deleteDatabase("vault.db")
+            }
+        }
+
+    @Test
+    fun configuredRecoveryCodeRestoresVaultAfterNewBiometricAuthentication() =
+        runBlocking<Unit> {
+            manager.initializeDatabase(cipher)
+            val expected = manager.getSessionVaultKey().copyOf()
+            val code = manager.createRecoveryCode()
+            assertFalse(prefs.all.values.any { it == code })
+            manager.clearSession()
+            every { crypto.prepareRecoveryCipher("VaultRecoveryMasterKey") } returns cipher
+            val attempt = manager.prepareRecovery(code)
+            assertFalse(manager.isDatabaseInitialized())
+            manager.completeRecovery(attempt, cipher)
+            assertArrayEquals(expected, manager.getSessionVaultKey())
+            assertTrue(attempt.key.all { it == 0.toByte() })
+            assertEquals("VaultRecoveryMasterKey", prefs.getString("biometric_key_alias", null))
+            every { crypto.getMasterDecryptionCipher(any(), "VaultRecoveryMasterKey") } returns
+                cipher
+            assertSame(cipher, manager.getPassphraseCipher())
+            expected.fill(0)
+        }
+
+    @Test
+    fun wrongRecoveryCodeDoesNotReplaceBiometricKeyOrOpenDatabase() =
+        runBlocking<Unit> {
+            manager.initializeDatabase(cipher)
+            manager.createRecoveryCode()
+            manager.clearSession()
+            clearMocks(crypto, answers = false, recordedCalls = true)
+            try {
+                manager.prepareRecovery("A".repeat(43))
+                fail("Expected wrong code")
+            } catch (_: javax.crypto.AEADBadTagException) {}
+            verify(exactly = 0) { crypto.prepareRecoveryCipher(any()) }
+            assertFalse(manager.isDatabaseInitialized())
+            assertNull(prefs.getString("biometric_key_alias", null))
+        }
+
+    @Test
+    fun noConfiguredRecoveryCodeNeverGeneratesNewHardwareKey() =
+        runBlocking<Unit> {
+            try {
+                manager.prepareRecovery("A".repeat(43))
+                fail("Expected missing recovery envelope")
+            } catch (_: IllegalStateException) {}
+            verify(exactly = 0) { crypto.prepareRecoveryCipher(any()) }
+        }
+
+    @Test
+    fun lockedVaultCannotCreateRecoveryEnvelope() =
+        runBlocking<Unit> {
+            try {
+                manager.createRecoveryCode()
+                fail("Expected locked vault")
+            } catch (_: VaultError.UninitializedVault) {}
+            assertFalse(prefs.contains("recovery_ciphertext"))
+        }
+
+    @Test
+    fun lockingBetweenRecoveryPreparationAndSuccessRevokesRecovery() =
+        runBlocking<Unit> {
+            manager.initializeDatabase(cipher)
+            val code = manager.createRecoveryCode()
+            manager.clearSession()
+            every { crypto.prepareRecoveryCipher(any()) } returns cipher
+            val attempt = manager.prepareRecovery(code)
+            manager.clearSession()
+            try {
+                manager.completeRecovery(attempt, cipher)
+                fail("Expected revoked recovery")
+            } catch (_: kotlinx.coroutines.CancellationException) {}
+            assertFalse(manager.isDatabaseInitialized())
+            assertTrue(attempt.key.all { it == 0.toByte() })
+            assertNull(prefs.getString("biometric_key_alias", null))
+        }
+
+    @Test
+    fun recoveryDatabaseFailurePreservesWrappingKeyAndRecoveryEnvelope() =
+        runBlocking<Unit> {
+            manager.initializeDatabase(cipher)
+            val code = manager.createRecoveryCode()
+            val before = prefs.all.toMap()
+            manager.clearSession()
+            every { crypto.prepareRecoveryCipher(any()) } returns cipher
+            val attempt = manager.prepareRecovery(code)
+            every { db.openHelper.writableDatabase } throws
+                IllegalStateException("synthetic database error")
+            try {
+                manager.completeRecovery(attempt, cipher)
+                fail("Expected open failure")
+            } catch (_: IllegalStateException) {}
+            assertEquals(before, prefs.all)
+            assertTrue(attempt.key.all { it == 0.toByte() })
+            assertFalse(manager.isDatabaseInitialized())
+        }
+
+    @Test
+    fun repeatedRecoveryUsesInactiveSlotAndPreservesExistingCode() =
+        runBlocking<Unit> {
+            manager.initializeDatabase(cipher)
+            val code = manager.createRecoveryCode()
+            every { crypto.prepareRecoveryCipher(any()) } returns cipher
+            manager.clearSession()
+            val first = manager.prepareRecovery(code)
+            assertEquals("VaultRecoveryMasterKey", first.alias)
+            manager.completeRecovery(first, cipher)
+            manager.clearSession()
+            val second = manager.prepareRecovery(code)
+            assertEquals("VaultMasterKey", second.alias)
+            manager.completeRecovery(second, cipher)
+            assertTrue(manager.isDatabaseInitialized())
+            verify(exactly = 1) { crypto.prepareRecoveryCipher("VaultRecoveryMasterKey") }
+            verify(exactly = 1) { crypto.prepareRecoveryCipher("VaultMasterKey") }
+        }
 }

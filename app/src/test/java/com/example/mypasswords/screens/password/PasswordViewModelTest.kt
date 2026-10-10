@@ -45,8 +45,132 @@ class PasswordViewModelTest {
         runCurrent()
     }
 
+    @Test
+    fun pendingFirstSnapshotRemainsLoadingInsteadOfShowingEmptyVault() = runTest {
+        every { repo.passwords } returns flow { awaitCancellation() }
+        vm = PasswordViewModel(repo, app)
+        subscribe()
+        assertSame(PasswordListStatus.Loading, vm.uiState.value.listStatus)
+        assertTrue(vm.filteredPasswords.value.isEmpty())
+    }
+
+    @Test
+    fun emptyAndLoadedSnapshotsHaveDifferentStatuses() = runTest {
+        rows.value = emptyList()
+        subscribe()
+        assertSame(PasswordListStatus.Empty, vm.uiState.value.listStatus)
+        rows.value = listOf(PasswordItemModel(9, "Site", "user"))
+        runCurrent()
+        assertSame(PasswordListStatus.Ready, vm.uiState.value.listStatus)
+        assertEquals(1, vm.filteredPasswords.value.size)
+    }
+
+    @Test
+    fun noSearchMatchesDoesNotBecomeAnEmptyVaultStatus() = runTest {
+        subscribe()
+        vm.onSearchQueryChanged("does not match any site")
+        runCurrent()
+        assertTrue(vm.filteredPasswords.value.isEmpty())
+        assertSame(PasswordListStatus.Ready, vm.uiState.value.listStatus)
+    }
+
+    @Test
+    fun stoppedSubscriptionReleasesReplayedPlaintextList() = runTest {
+        val collector =
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                vm.filteredPasswords.collect()
+            }
+        runCurrent()
+        assertTrue(vm.filteredPasswords.value.isNotEmpty())
+        collector.cancel()
+        advanceTimeBy(5001)
+        runCurrent()
+        assertTrue(vm.filteredPasswords.value.isEmpty())
+    }
+
     private fun detail() =
         FullCredentialModel(1, "Google", "user".toCharArray(), "pass".toCharArray(), "url", 2)
+
+    @Test
+    fun emptyEditedFieldsNeverReachRepository() = runTest {
+        coEvery { repo.getDecryptedCredential(1) } returns detail()
+        vm.onEditClick(rows.value.first())
+        runCurrent()
+        vm.updateCredential("", "secret")
+        runCurrent()
+        vm.updateCredential("user", "")
+        runCurrent()
+        coVerify(exactly = 0) { repo.updatePassword(any(), any()) }
+        assertNotNull(vm.uiState.value.error)
+        assertFalse(vm.uiState.value.isUpdating)
+    }
+
+    @Test
+    fun doubleUpdateWhileSavingSubmitsOnceAndResetsBusyState() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        coEvery { repo.getDecryptedCredential(1) } returns detail()
+        coEvery { repo.updatePassword(any(), any()) } coAnswers { gate.await() }
+        vm.onEditClick(rows.value.first())
+        runCurrent()
+        vm.updateCredential("user", "secret")
+        runCurrent()
+        assertTrue(vm.uiState.value.isUpdating)
+        vm.updateCredential("other", "new secret")
+        runCurrent()
+        coVerify(exactly = 1) { repo.updatePassword(any(), any()) }
+        gate.complete(Unit)
+        runCurrent()
+        assertFalse(vm.uiState.value.isUpdating)
+    }
+
+    @Test
+    fun retryRestartsFailedListSubscriptionAndReceivesSubsequentChanges() = runTest {
+        var subscriptions = 0
+        every { repo.passwords } returns
+            flow {
+                subscriptions++
+                if (subscriptions == 1) throw VaultError.DecryptionError(IllegalStateException())
+                emitAll(rows)
+            }
+        vm = PasswordViewModel(repo, app)
+        subscribe()
+        assertTrue(vm.uiState.value.listStatus is PasswordListStatus.Failed)
+        assertTrue(vm.filteredPasswords.value.isEmpty())
+        vm.retryLoadingPasswords()
+        runCurrent()
+        assertFalse(vm.uiState.value.listStatus is PasswordListStatus.Failed)
+        assertEquals(rows.value, vm.filteredPasswords.value)
+        rows.value = rows.value.take(1)
+        runCurrent()
+        assertEquals(1, vm.filteredPasswords.value.size)
+        assertEquals(2, subscriptions)
+    }
+
+    @Test
+    fun repeatedFailedRetriesRemainAvailableAndPreserveError() = runTest {
+        every { repo.passwords } returns flow { throw VaultError.UninitializedVault }
+        vm = PasswordViewModel(repo, app)
+        subscribe()
+        repeat(3) {
+            vm.retryLoadingPasswords()
+            runCurrent()
+            assertTrue(vm.uiState.value.listStatus is PasswordListStatus.Failed)
+            assertSame(VaultError.UninitializedVault, vm.uiState.value.error)
+        }
+    }
+
+    @Test
+    fun recoveryCodeIsCreatedOnlyOnRequestAndRemovedWhenDialogCloses() = runTest {
+        coEvery { repo.createRecoveryCode() } returns "synthetic code"
+        vm.showRecoveryDialog()
+        coVerify(exactly = 0) { repo.createRecoveryCode() }
+        vm.createRecoveryCode()
+        runCurrent()
+        assertEquals("synthetic code", vm.uiState.value.recoveryCode)
+        vm.dismissRecoveryDialog()
+        assertNull(vm.uiState.value.recoveryCode)
+        assertFalse(vm.uiState.value.isRecoveryDialogVisible)
+    }
 
     @Test
     fun initialStateHasAllLocalizedCategoriesAndNoDialogs() {
@@ -103,11 +227,11 @@ class PasswordViewModelTest {
     }
 
     @Test
-    fun searchDoesNotMatchUsername() = runTest {
+    fun advancedSearchMatchesUsernameAsWellAsPlatform() = runTest {
         subscribe()
         vm.onSearchQueryChanged("google")
         runCurrent()
-        assertEquals(listOf(1), vm.filteredPasswords.value.map { it.id })
+        assertEquals(listOf(1, 2), vm.filteredPasswords.value.map { it.id })
     }
 
     @Test
@@ -145,7 +269,7 @@ class PasswordViewModelTest {
         assertEquals(listOf(1), vm.filteredPasswords.value.map { it.id })
         vm.onCategorySelected(3)
         runCurrent()
-        assertTrue(vm.filteredPasswords.value.isEmpty())
+        assertEquals(listOf(2), vm.filteredPasswords.value.map { it.id })
     }
 
     @Test

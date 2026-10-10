@@ -2,26 +2,22 @@ package com.example.mypasswords.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+val Purple80 = Color(0xFF8EBBFF)
+val PurpleGrey80 = Color(0xFF78D8CC)
+val Pink80 = Color(0xFFB7C8ED)
+val Purple40 = Color(0xFF245ACB)
+val PurpleGrey40 = Color(0xFF006B62)
+val Pink40 = Color(0xFF52638B)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
-
-// Custom App Colors
-val BackgroundColor = Color(0xFF101622)
-val ButtonColor = Color(0xFF1D4ED8)
-val CircleIconColor = Color(0xFF135BEC)
-val CircleIconBackGroundColor = Color(0x08FFFFFF)
-val CircleIconBorderColor = Color(0x0DFFFFFF)
-val ShieldBlurColor = Color(0xFF1E3A8A)
-val RectangleBackGroundColor = Color(0xFF0F172A)
-val RectangleIconBorderColor = Color(0x4D808080)
-
-val TitleTextColor = Color.White
-val SubTitleTextColor = Color(0xFF94A3B8)
-
-val DeleteButtonColor = Color(0xFFEF4444)
-val DeleteButtonBackgroundColor = Color(0x1AEF4444)
+val BackgroundColor = Color(0xFF091321)
+val ButtonColor = Color(0xFF245ACB)
+val CircleIconColor = Color(0xFF78D8CC)
+val CircleIconBackGroundColor = Color(0xFF143B40)
+val CircleIconBorderColor = Color(0xFF25545B)
+val ShieldBlurColor = Color(0xFF245ACB)
+val RectangleBackGroundColor = Color(0xFF142235)
+val RectangleIconBorderColor = Color(0xFF2B4058)
+val TitleTextColor = Color(0xFFF1F6FF)
+val SubTitleTextColor = Color(0xFFACBED4)
+val DeleteButtonColor = Color(0xFFFFB4AB)
+val DeleteButtonBackgroundColor = Color(0xFF45262D)

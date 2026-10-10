@@ -189,9 +189,32 @@ class AddPasswordViewModelTest {
     }
 
     @Test
-    fun faviconDomainRemovesWhitespaceAndPunctuation() = runTest {
+    fun tagsAreNormalizedAndSavedWithoutChangingCredentials() = runTest {
+        fill("Synthetic account")
+        vm.onTagsChanged(" Work, work, אישי ")
+        var saved: Credential? = null
+        coEvery { repo.addPassword(any()) } answers { saved = firstArg() }
+        vm.onSaveClick()
+        advanceUntilIdle()
+        assertEquals(listOf("Work", "אישי"), saved!!.tags)
+        assertTrue(saved!!.password.all { it == 0.toByte() })
+    }
+
+    @Test
+    fun invalidTagsStayInvalidAfterOtherFieldChangesAndCanBeCorrected() {
+        fill("Synthetic account")
+        vm.onTagsChanged("x".repeat(33))
+        assertFalse(vm.uiState.value.isSaveEnabled)
+        vm.onUsernameChanged("another user")
+        assertFalse(vm.uiState.value.isSaveEnabled)
+        vm.onTagsChanged("work")
+        assertTrue(vm.uiState.value.isSaveEnabled)
+    }
+
+    @Test
+    fun platformNameDoesNotCreateTrackingUrl() = runTest {
         assertEquals(
-            "https://www.google.com/s2/favicons?domain=google.com&sz=128",
+            "",
             savedWebsite(" Go og!le "),
         )
     }
@@ -199,17 +222,17 @@ class AddPasswordViewModelTest {
     @Test fun shortDomainOmitsFavicon() = runTest { assertEquals("", savedWebsite("AB")) }
 
     @Test
-    fun threeCharacterDomainGetsFavicon() = runTest {
+    fun threeCharacterPlatformDoesNotCreateTrackingUrl() = runTest {
         assertEquals(
-            "https://www.google.com/s2/favicons?domain=abc.com&sz=128",
+            "",
             savedWebsite("ABC"),
         )
     }
 
     @Test
-    fun numericDomainIsSupported() = runTest {
+    fun numericPlatformDoesNotCreateTrackingUrl() = runTest {
         assertEquals(
-            "https://www.google.com/s2/favicons?domain=123.com&sz=128",
+            "",
             savedWebsite("123"),
         )
     }

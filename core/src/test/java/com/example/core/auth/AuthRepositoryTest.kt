@@ -7,7 +7,14 @@ import org.junit.Test
 
 class AuthRepositoryTest {
     private val database = mockk<DatabaseManager>(relaxed = true)
+    private val session = VaultSession()
     private val auth = AuthRepository(database)
+
+    @org.junit.Before
+    fun connectSession() {
+        every { database.session } returns session
+        every { database.clearSession() } answers { session.lock() }
+    }
 
     @Test
     fun startsLocked() {
@@ -55,7 +62,11 @@ class AuthRepositoryTest {
 
     @Test
     fun stateIsLockedEvenWhenClosingDatabaseThrows() {
-        every { database.clearSession() } throws IllegalStateException()
+        every { database.clearSession() } answers
+            {
+                session.lock()
+                throw IllegalStateException()
+            }
         auth.setAuthenticated(true)
         assertThrows(IllegalStateException::class.java) { auth.setAuthenticated(false) }
         assertFalse(auth.isAuthenticated.value)

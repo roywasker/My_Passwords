@@ -1,37 +1,35 @@
 package com.example.mypasswords.screens.welcome
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -39,187 +37,130 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.compose_ui.components.CButton
-import com.example.compose_ui.components.CFloatingIcon
-import com.example.compose_ui.components.CIconWithUnderText
-import com.example.compose_ui.components.CImageResource
 import com.example.compose_ui.components.CText
 import com.example.mypasswords.R
-import com.example.mypasswords.ui.theme.BackgroundColor
 import com.example.mypasswords.ui.theme.ButtonColor
 import com.example.mypasswords.ui.theme.CircleIconBackGroundColor
 import com.example.mypasswords.ui.theme.CircleIconBorderColor
 import com.example.mypasswords.ui.theme.CircleIconColor
 import com.example.mypasswords.ui.theme.RectangleBackGroundColor
-import com.example.mypasswords.ui.theme.RectangleIconBorderColor
 import com.example.mypasswords.ui.theme.ShieldBlurColor
 import com.example.mypasswords.ui.theme.SubTitleTextColor
 import com.example.mypasswords.ui.theme.TitleTextColor
+import com.example.mypasswords.ui.theme.VaultBadge
+import com.example.mypasswords.ui.theme.VaultFeature
+import com.example.mypasswords.ui.theme.vaultBackdrop
 
 @Composable
 fun WelcomeScreen(onClick: () -> Unit) {
-    Box(modifier = Modifier.fillMaxSize().background(BackgroundColor)) {
+    if (com.example.compose_ui.components.isVaultLandscape()) {
+        LandscapeWelcome(onClick)
+        return
+    }
+    Column(
+        modifier =
+            Modifier.fillMaxSize()
+                .vaultBackdrop()
+                .systemBarsPadding()
+                .padding(horizontal = 28.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         Column(
-            modifier =
-                Modifier.fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp, vertical = 40.dp),
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                CFloatingIcon(
-                    icon = Icons.Default.Security,
-                    iconSize = 20.dp,
-                    size = 40.dp,
-                    iconBackGroundColor = CircleIconBackGroundColor,
-                    borderColor = CircleIconBorderColor,
-                    borderWidth = 1.dp,
-                    iconTint = CircleIconColor,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            CentralShieldGraphic()
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            CText(
-                text = stringResource(id = R.string.welcome_screen_title),
-                color = TitleTextColor,
-                fontSize = 28.sp,
-                lineHeight = 34.sp,
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.ExtraBold,
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            CText(
-                text = stringResource(id = R.string.welcome_screen_subtitle),
-                color = SubTitleTextColor,
-                lineHeight = 28.sp,
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Medium,
-            )
-
-            Spacer(modifier = Modifier.height(30.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CIconWithUnderText(
-                    icon = Icons.Default.Devices,
-                    label = stringResource(id = R.string.welcome_screen_backup_icon),
-                )
-                VerticalDivider(
-                    modifier = Modifier.height(30.dp),
-                    color = Color.DarkGray.copy(alpha = 0.5f),
-                )
-                CIconWithUnderText(
-                    icon = Icons.Default.Sync,
-                    label = stringResource(id = R.string.welcome_screen_sync_icon),
-                )
-                VerticalDivider(
-                    modifier = Modifier.height(30.dp),
-                    color = Color.DarkGray.copy(alpha = 0.5f),
-                )
-                CIconWithUnderText(
-                    icon = Icons.Default.LockReset,
-                    label = stringResource(id = R.string.welcome_screen_encrypt_icon),
+                VaultBadge(stringResource(R.string.vault_private_badge))
+                androidx.compose.material3.Text(
+                    "MY PASSWORDS",
+                    color = SubTitleTextColor,
+                    style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
                 )
             }
-
-            Spacer(modifier = Modifier.height(30.dp))
-
-            CButton(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp).height(64.dp),
-                buttonColor = ButtonDefaults.buttonColors(containerColor = ButtonColor),
-                text = stringResource(id = R.string.welcome_screen_button_text),
-                textColor = Color.White,
-                textFontSize = 18.sp,
-                textFontWeight = FontWeight.Bold,
-                onClick = onClick,
-                icon = Icons.AutoMirrored.Filled.ArrowBack,
-                iconSize = 24.dp,
+            CentralShieldGraphic()
+            CText(
+                stringResource(R.string.welcome_screen_title),
+                color = TitleTextColor,
+                fontSize = 28.sp,
+                lineHeight = 38.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Right,
+            )
+            CText(
+                stringResource(R.string.welcome_screen_subtitle),
+                color = SubTitleTextColor,
+                fontSize = 16.sp,
+                lineHeight = 27.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Right,
+            )
+            VaultFeature(
+                Icons.Default.Fingerprint,
+                stringResource(R.string.welcome_biometric_title),
+                stringResource(R.string.welcome_biometric_body),
+                compact = true,
+            )
+            VaultFeature(
+                Icons.Default.LockReset,
+                stringResource(R.string.welcome_local_title),
+                stringResource(R.string.welcome_local_body),
+                compact = true,
             )
         }
+        CButton(
+            text = stringResource(R.string.welcome_screen_button_text),
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+            buttonShape = RoundedCornerShape(20.dp),
+            buttonColor = ButtonDefaults.buttonColors(containerColor = ButtonColor),
+            textFontSize = 17.sp,
+            textFontWeight = FontWeight.SemiBold,
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+        )
     }
 }
 
 @Composable
 fun CentralShieldGraphic() {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier =
-            Modifier.size(240.dp)
+    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.size(118.dp)
                 .background(
-                    brush =
-                        Brush.radialGradient(
-                            colors =
-                                listOf(
-                                    ShieldBlurColor.copy(alpha = 0.8f),
-                                    Color.Transparent,
-                                )
-                        )
-                ),
-    ) {
-        Box(
-            modifier =
-                Modifier.size(220.dp).drawBehind {
-                    drawCircle(
-                        color = Color(0xFF1E3A8A).copy(alpha = 0.8f),
-                        style = Stroke(width = 1.dp.toPx()),
-                    )
-                }
+                    Brush.radialGradient(
+                        listOf(ShieldBlurColor.copy(alpha = 0.35f), Color.Transparent)
+                    ),
+                    CircleShape,
+                )
         )
         Box(
-            modifier =
-                Modifier.size(170.dp).drawBehind {
-                    drawCircle(
-                        color = Color(0xFF1E3A8A).copy(alpha = 0.8f),
-                        style = Stroke(width = 1.dp.toPx()),
-                    )
-                }
+            Modifier.size(104.dp)
+                .border(1.dp, CircleIconBorderColor.copy(alpha = 0.65f), RoundedCornerShape(48.dp))
         )
-
         Box(
-            modifier = Modifier.size(90.dp),
+            Modifier.size(88.dp)
+                .clip(RoundedCornerShape(36.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(CircleIconBackGroundColor, RectangleBackGroundColor)
+                    )
+                )
+                .border(1.dp, CircleIconBorderColor, RoundedCornerShape(36.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            CImageResource(
-                drawableResId = R.drawable.shield,
-                modifier = Modifier.size(50.dp),
+            androidx.compose.material3.Icon(
+                Icons.Default.Security,
+                null,
+                tint = CircleIconColor,
+                modifier = Modifier.size(42.dp),
             )
         }
-
-        CFloatingIcon(
-            icon = Icons.Default.Fingerprint,
-            iconSize = 22.dp,
-            size = 44.dp,
-            iconBackGroundColor = RectangleBackGroundColor,
-            borderColor = RectangleIconBorderColor,
-            borderWidth = 1.dp,
-            iconTint = CircleIconColor,
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.align(Alignment.TopEnd).offset(x = (-20).dp, y = 30.dp),
-        )
-        CFloatingIcon(
-            icon = Icons.Default.VpnKey,
-            iconSize = 20.dp,
-            size = 44.dp,
-            iconBackGroundColor = RectangleBackGroundColor,
-            borderColor = RectangleIconBorderColor,
-            borderWidth = 1.dp,
-            iconTint = CircleIconColor,
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.align(Alignment.BottomStart).offset(x = 20.dp, y = (-30).dp),
-        )
     }
 }
 
@@ -227,4 +168,77 @@ fun CentralShieldGraphic() {
 @Composable
 fun WelcomeScreenPreview() {
     WelcomeScreen(onClick = {})
+}
+
+@Composable
+private fun LandscapeWelcome(onClick: () -> Unit) {
+    Box(
+        Modifier.fillMaxSize()
+            .vaultBackdrop()
+            .systemBarsPadding()
+            .displayCutoutPadding()
+            .padding(20.dp)
+    ) {
+        // A weighted footer stays visible while each pane can scroll independently.
+        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+            Column(
+                Modifier.weight(1f).fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(
+                    Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    VaultFeature(
+                        Icons.Default.Fingerprint,
+                        stringResource(R.string.welcome_biometric_title),
+                        stringResource(R.string.welcome_biometric_body),
+                        compact = true,
+                    )
+                    VaultFeature(
+                        Icons.Default.LockReset,
+                        stringResource(R.string.welcome_local_title),
+                        stringResource(R.string.welcome_local_body),
+                        compact = true,
+                    )
+                }
+                CButton(
+                    text = stringResource(R.string.welcome_screen_button_text),
+                    onClick = onClick,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                    buttonShape = RoundedCornerShape(20.dp),
+                    buttonColor = ButtonDefaults.buttonColors(containerColor = ButtonColor),
+                    textFontSize = 17.sp,
+                    textFontWeight = FontWeight.SemiBold,
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                )
+            }
+            Column(
+                Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                VaultBadge(stringResource(R.string.vault_private_badge))
+                CentralShieldGraphic()
+                CText(
+                    stringResource(R.string.welcome_screen_title),
+                    color = TitleTextColor,
+                    fontSize = 24.sp,
+                    lineHeight = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Right,
+                )
+                CText(
+                    stringResource(R.string.welcome_screen_subtitle),
+                    color = SubTitleTextColor,
+                    fontSize = 15.sp,
+                    lineHeight = 24.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Right,
+                )
+            }
+        }
+    }
 }

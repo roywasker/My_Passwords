@@ -39,7 +39,6 @@ class MainActivityNavigationTest {
                 mockkConstructor(DatabaseManager::class, BiometricAuthManager::class)
                 every { anyConstructed<DatabaseManager>().getPassphraseCipher() } returns cipher
                 coEvery { anyConstructed<DatabaseManager>().initializeDatabase(any()) } just Runs
-                every { anyConstructed<DatabaseManager>().clearSession() } just Runs
                 every {
                     anyConstructed<BiometricAuthManager>()
                         .promptBiometricAuth(
@@ -119,10 +118,11 @@ class MainActivityNavigationTest {
     }
 
     @Test
-    fun failedScanReturnsToWelcomeWithoutUnlocking() {
+    fun failedScanStaysInAuthenticationWithoutUnlocking() {
         startAuthentication()
         compose.runOnIdle { scanFailed.captured() }
-        compose.onNodeWithText(text(R.string.welcome_screen_title)).assertExists()
+        compose.onNodeWithText(text(R.string.fingerPrint_screen_title)).assertExists()
+        compose.onNodeWithText(text(R.string.error_biometric_auth_failed)).assertExists()
         compose.runOnIdle { assertFalse(compose.activity.authRepository.isAuthenticated.value) }
     }
 
@@ -163,6 +163,25 @@ class MainActivityNavigationTest {
         compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
         compose.onNodeWithText(text(R.string.welcome_screen_title)).assertExists()
         compose.runOnIdle { assertFalse(compose.activity.authRepository.isAuthenticated.value) }
+    }
+
+    @Test
+    fun backgroundingDuringVaultOpenCannotBeUndoneByLateCompletion() {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { anyConstructed<DatabaseManager>().initializeDatabase(any()) } coAnswers
+            {
+                gate.await()
+            }
+        startAuthentication()
+        val result = mockk<BiometricPrompt.AuthenticationResult>()
+        every { result.cryptoObject } returns BiometricPrompt.CryptoObject(cipher)
+        compose.runOnIdle { success.captured(result) }
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+        gate.complete(Unit)
+        compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        compose.waitForIdle()
+        compose.runOnIdle { assertFalse(compose.activity.authRepository.isAuthenticated.value) }
+        compose.onNodeWithText(text(R.string.password_screen_title)).assertDoesNotExist()
     }
 
     @Test

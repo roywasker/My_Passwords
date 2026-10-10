@@ -25,6 +25,7 @@ data class AddPasswordUiState(
     val isSaved: Boolean = false,
     val isSaving: Boolean = false,
     val error: com.example.core.model.VaultError? = null,
+    val tagsInput: String = "",
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -39,6 +40,7 @@ data class AddPasswordUiState(
         if (error != other.error) return false
         if (categories != other.categories) return false
         if (platformName != other.platformName) return false
+        if (tagsInput != other.tagsInput) return false
         if (!username.contentEquals(other.username)) return false
         if (!password.contentEquals(other.password)) return false
 
@@ -53,6 +55,7 @@ data class AddPasswordUiState(
         result = 31 * result + (error?.hashCode() ?: 0)
         result = 31 * result + categories.hashCode()
         result = 31 * result + platformName.hashCode()
+        result = 31 * result + tagsInput.hashCode()
         result = 31 * result + username.contentHashCode()
         result = 31 * result + password.contentHashCode()
         return result
@@ -132,12 +135,31 @@ constructor(
         _uiState.update { it.copy(selectedCategoryId = categoryId) }
     }
 
-    private fun validate(platform: String, user: CharArray, pass: CharArray): Boolean {
-        return platform.isNotBlank() && user.isNotEmpty() && pass.isNotEmpty()
+    fun onTagsChanged(input: String) {
+        if (_uiState.value.isSaving || _uiState.value.isSaved) return
+        _uiState.update {
+            it.copy(
+                tagsInput = input,
+                isSaveEnabled = validate(it.platformName, it.username, it.password, input),
+            )
+        }
+    }
+
+    private fun validate(
+        platform: String,
+        user: CharArray,
+        pass: CharArray,
+        tags: String = _uiState.value.tagsInput,
+    ): Boolean {
+        return com.example.core.model.CredentialValidator.isValid(platform, user, pass) &&
+            runCatching { com.example.core.model.TagRules.parse(tags) }.isSuccess
     }
 
     fun onSaveClick() {
         val state = _uiState.value
+        val tags =
+            runCatching { com.example.core.model.TagRules.parse(state.tagsInput) }.getOrNull()
+                ?: return
         if (
             state.isSaveEnabled &&
                 !state.isSaving &&
@@ -150,28 +172,15 @@ constructor(
             val job = viewModelScope.launch {
                 var credential: Credential? = null
                 try {
-                    val domain =
-                        state.platformName
-                            .trim()
-                            .lowercase()
-                            .replace("\\s+".toRegex(), "") // Remove all spaces
-                            .replace("[^a-z0-9]".toRegex(), "") // Remove non-alphanumeric
-
-                    val iconUrl =
-                        if (domain.length >= 3) {
-                            "https://www.google.com/s2/favicons?domain=${domain}.com&sz=128"
-                        } else {
-                            ""
-                        }
-
                     // Convert CharArray to ByteArray for encryption
                     val submittedCredential =
                         Credential(
                             platformName = state.platformName,
                             username = usernameBytes,
                             password = passwordBytes,
-                            website = iconUrl,
+                            website = "",
                             categoryId = state.selectedCategoryId,
+                            tags = tags,
                         )
 
                     credential = submittedCredential

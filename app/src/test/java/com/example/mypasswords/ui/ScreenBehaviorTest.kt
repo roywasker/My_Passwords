@@ -2,7 +2,6 @@ package com.example.mypasswords.ui
 
 import android.app.Application
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.v2.createComposeRule
 import com.example.core.model.*
 import com.example.mypasswords.R
 import com.example.mypasswords.screens.finger.*
@@ -21,7 +20,108 @@ import org.robolectric.annotation.LooperMode
 @Config(sdk = [28], application = Application::class, qualifiers = "w411dp-h891dp")
 @LooperMode(LooperMode.Mode.PAUSED)
 class ScreenBehaviorTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule
+    val compose =
+        androidx.compose.ui.test.junit4.v2.createAndroidComposeRule<
+            androidx.activity.ComponentActivity
+        >()
+
+    @Test
+    fun passwordFieldTellsInputMethodItContainsPasswordWithoutAutocorrect() {
+        val vm = addVm(AddPasswordUiState())
+        compose.setContent { AddPasswordScreen(vm, {}) }
+        compose.onAllNodes(hasSetTextAction())[2].performScrollTo().performClick()
+        compose.runOnIdle {
+            val info = android.view.inputmethod.EditorInfo()
+            val focused = compose.activity.window.decorView.findFocus()
+            assertNotNull(focused)
+            assertNotNull(focused.onCreateInputConnection(info))
+            assertEquals(
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD,
+                info.inputType and android.text.InputType.TYPE_MASK_VARIATION,
+            )
+            assertEquals(0, info.inputType and android.text.InputType.TYPE_TEXT_FLAG_AUTO_CORRECT)
+        }
+    }
+
+    @Test
+    fun failedListShowsActionableRetryEvenAfterSnackbarErrorIsCleared() {
+        val vm = mockk<PasswordViewModel>(relaxed = true)
+        every { vm.uiState } returns
+            MutableStateFlow(
+                PasswordUiState(
+                    listStatus = PasswordListStatus.Failed(VaultError.UninitializedVault)
+                )
+            )
+        every { vm.filteredPasswords } returns MutableStateFlow(emptyList())
+        compose.setContent { PasswordScreen(vm, {}, {}) }
+        compose.onNodeWithText(text(R.string.retry_loading)).assertIsDisplayed().performClick()
+        verify(exactly = 1) { vm.retryLoadingPasswords() }
+    }
+
+    private fun listScreen(status: PasswordListStatus) {
+        val vm = mockk<PasswordViewModel>(relaxed = true)
+        every { vm.uiState } returns MutableStateFlow(PasswordUiState(listStatus = status))
+        every { vm.filteredPasswords } returns MutableStateFlow(emptyList())
+        compose.setContent { PasswordScreen(vm, {}, {}) }
+    }
+
+    @Test
+    fun loadingListDoesNotMisleadUserWithEmptyVaultMessage() {
+        listScreen(PasswordListStatus.Loading)
+        compose.onNodeWithText(text(R.string.passwords_loading)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.passwords_empty)).assertDoesNotExist()
+        compose.onNodeWithText(text(R.string.retry_loading)).assertDoesNotExist()
+    }
+
+    @Test
+    fun emptyVaultHasDifferentMessageFromSearchWithNoMatches() {
+        listScreen(PasswordListStatus.Empty)
+        compose.onNodeWithText(text(R.string.passwords_empty)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.passwords_no_results)).assertDoesNotExist()
+    }
+
+    @Test
+    fun filteredEmptyListDisplaysNoResultsRatherThanEmptyVault() {
+        listScreen(PasswordListStatus.Ready)
+        compose.onNodeWithText(text(R.string.passwords_no_results)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.passwords_empty)).assertDoesNotExist()
+    }
+
+    @Test
+    fun failedListShowsItsErrorWithoutClaimingVaultIsEmpty() {
+        listScreen(PasswordListStatus.Failed(VaultError.DatabaseError(IllegalStateException())))
+        compose.onNodeWithText(text(R.string.error_database_access)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.passwords_empty)).assertDoesNotExist()
+    }
+
+    @Test
+    fun recoverySetupRequiresExplicitGenerationBeforeDisplayingCode() {
+        var generate = 0
+        compose.setContent { RecoveryCodeDialog(null, false, { generate++ }, {}) }
+        compose.onNodeWithText(text(R.string.recovery_generate)).performClick()
+        compose.runOnIdle { assertEquals(1, generate) }
+    }
+
+    @Test
+    fun busyRecoverySetupCannotSubmitTwice() {
+        compose.setContent { RecoveryCodeDialog(null, true, { fail("Duplicate generation") }, {}) }
+        compose.onNodeWithText(text(R.string.recovery_generate)).assertIsNotEnabled()
+    }
+
+    @Test
+    fun existingRemoteIconUrlUsesLocalLetterInsteadOfNetworkImage() {
+        compose.setContent {
+            PasswordCard(
+                PasswordItemModel(1, "Bank", "user", "https://example.invalid/track"),
+                {},
+                {},
+                {},
+            )
+        }
+        compose.onNodeWithText("B").assertExists()
+        compose.onNodeWithContentDescription("Bank").assertDoesNotExist()
+    }
 
     private fun text(id: Int) = RuntimeEnvironment.getApplication().getString(id)
 
@@ -31,6 +131,18 @@ class ScreenBehaviorTest {
         compose.setContent { WelcomeScreen { calls++ } }
         compose.onNodeWithText(text(R.string.welcome_screen_button_text)).performClick()
         compose.runOnIdle { assertEquals(1, calls) }
+    }
+
+    @Test
+    @Config(qualifiers = "w360dp-h640dp")
+    fun compactWelcomeKeepsAuthenticationActionVisibleWithoutScrolling() {
+        var clicks = 0
+        compose.setContent { WelcomeScreen { clicks++ } }
+        compose
+            .onNodeWithText(text(R.string.welcome_screen_button_text))
+            .assertIsDisplayed()
+            .performClick()
+        compose.runOnIdle { assertEquals(1, clicks) }
     }
 
     @Test
@@ -163,7 +275,9 @@ class ScreenBehaviorTest {
     fun addFormForwardsGeneratorAction() {
         val vm = addVm(AddPasswordUiState())
         compose.setContent { AddPasswordScreen(vm, {}) }
-        compose.onNodeWithContentDescription("Generate").performClick()
+        compose
+            .onNodeWithContentDescription(text(com.example.compose_ui.R.string.credential_generate))
+            .performClick()
         compose.runOnIdle { verify(exactly = 1) { vm.onGeneratePasswordClicked() } }
     }
 
@@ -197,7 +311,8 @@ class ScreenBehaviorTest {
     @Test
     fun passwordScreenShowsFilteredRowsOnly() {
         val vm = mockk<PasswordViewModel>(relaxed = true)
-        every { vm.uiState } returns MutableStateFlow(PasswordUiState())
+        every { vm.uiState } returns
+            MutableStateFlow(PasswordUiState(listStatus = PasswordListStatus.Ready))
         every { vm.filteredPasswords } returns
             MutableStateFlow(listOf(PasswordItemModel(1, "Google", "user")))
         compose.setContent { PasswordScreen(vm, {}, {}) }
@@ -271,7 +386,6 @@ class ScreenBehaviorTest {
         compose.setContent { WelcomeScreen { clicks++ } }
         compose
             .onNodeWithText(text(R.string.welcome_screen_button_text))
-            .performScrollTo()
             .assertIsDisplayed()
             .performClick()
         compose.runOnIdle { assertEquals(1, clicks) }
@@ -282,16 +396,12 @@ class ScreenBehaviorTest {
     fun knownSaveButtonWorksOnCompactDisplay() {
         val vm = addVm(AddPasswordUiState(isSaveEnabled = true))
         compose.setContent { AddPasswordScreen(vm, {}) }
-        compose
-            .onNodeWithText(text(R.string.save_now_btn))
-            .performScrollTo()
-            .assertIsDisplayed()
-            .performClick()
+        compose.onNodeWithText(text(R.string.save_now_btn)).assertIsDisplayed().performClick()
         compose.runOnIdle { verify(exactly = 1) { vm.onSaveClick() } }
     }
 
     @Test
-    fun largeFontWelcomeActionRemainsReachableByScrolling() {
+    fun largeFontWelcomeActionIsVisibleWithoutScrolling() {
         var clicked = 0
         compose.setContent {
             androidx.compose.runtime.CompositionLocalProvider(
@@ -303,14 +413,13 @@ class ScreenBehaviorTest {
         }
         compose
             .onNodeWithText(text(R.string.welcome_screen_button_text))
-            .performScrollTo()
             .assertIsDisplayed()
             .performClick()
         compose.runOnIdle { assertEquals(1, clicked) }
     }
 
     @Test
-    fun largeFontAddFormSaveActionRemainsReachableByScrolling() {
+    fun largeFontAddFormSaveActionIsVisibleWithoutScrolling() {
         val vm = addVm(AddPasswordUiState(isSaveEnabled = true))
         compose.setContent {
             androidx.compose.runtime.CompositionLocalProvider(
@@ -320,11 +429,7 @@ class ScreenBehaviorTest {
                 AddPasswordScreen(vm, {})
             }
         }
-        compose
-            .onNodeWithText(text(R.string.save_now_btn))
-            .performScrollTo()
-            .assertIsDisplayed()
-            .performClick()
+        compose.onNodeWithText(text(R.string.save_now_btn)).assertIsDisplayed().performClick()
         compose.runOnIdle { verify(exactly = 1) { vm.onSaveClick() } }
     }
 

@@ -36,6 +36,7 @@ class FingerPrintViewModelTest {
 
     @Before
     fun setup() {
+        every { biometric.cancelAuthentication() } just Runs
         every { database.getPassphraseCipher() } returns cipher
         coEvery { database.initializeDatabase(any()) } just Runs
         every { app.getString(any()) } answers { "resource-${firstArg<Int>()}" }
@@ -118,12 +119,10 @@ class FingerPrintViewModelTest {
     }
 
     @Test
-    fun failedScanPublishesNonfatalAuthFailure() = runTest {
+    fun failedScanRemainsAvailableForRetry() = runTest {
         prepare()
         failed.captured()
-        val s = vm.authState.value as AuthState.Error
-        assertSame(VaultError.BiometricAuthFailed, s.error)
-        assertFalse(s.isFatal)
+        assertSame(AuthState.ScanNotRecognized, vm.authState.value)
         verify(exactly = 0) { auth.setAuthenticated(true) }
     }
 
@@ -220,6 +219,91 @@ class FingerPrintViewModelTest {
         success.captured(result())
         runCurrent()
         assertSame(AuthState.Success, vm.authState.value)
+    }
+
+    @Test
+    fun revokedAuthenticationDoesNotUnlockAfterDatabaseCompletes() = runTest {
+        var generation = 0L
+        every { auth.sessionGeneration } answers { generation }
+        coEvery { database.initializeDatabase(any()) } coAnswers { generation++ }
+        prepare()
+        success.captured(result())
+        runCurrent()
+        verify(exactly = 0) { auth.setAuthenticated(true) }
+        assertNotSame(AuthState.Success, vm.authState.value)
+    }
+
+    @Test
+    fun callbackFromCancelledPromptCannotOpenDatabase() = runTest {
+        prepare()
+        val lateSuccess = success.captured
+        vm.cancelAuthentication()
+        lateSuccess(result())
+        runCurrent()
+        coVerify(exactly = 0) { database.initializeDatabase(any()) }
+        verify { biometric.cancelAuthentication() }
+    }
+
+    @Test
+    fun repeatedFailedScansKeepSamePromptAndAllowSuccess() = runTest {
+        prepare()
+        repeat(4) {
+            failed.captured()
+            assertSame(AuthState.ScanNotRecognized, vm.authState.value)
+        }
+        success.captured(result())
+        runCurrent()
+        assertSame(AuthState.Success, vm.authState.value)
+        verify(exactly = 1) {
+            biometric.promptBiometricAuth(any(), any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun invalidRecoveryCodeKeepsVaultLockedAndDoesNotPromptBiometrics() = runTest {
+        coEvery { database.prepareRecovery(any()) } throws IllegalArgumentException()
+        vm.prepareRecoveryAuthentication(activity, "synthetic incorrect code")
+        runCurrent()
+        assertTrue((vm.authState.value as AuthState.Error).isFatal)
+        verify(exactly = 0) { auth.setAuthenticated(true) }
+        verify(exactly = 0) {
+            biometric.promptBiometricAuth(any(), any(), any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun validRecoveryNeedsBiometricSuccessBeforeRewrappingOrUnlocking() = runTest {
+        val attempt = mockk<DatabaseManager.RecoveryAttempt>(relaxed = true)
+        every { attempt.cipher } returns cipher
+        coEvery { database.prepareRecovery("synthetic recovery code") } returns attempt
+        coEvery { database.completeRecovery(attempt, cipher) } just Runs
+        vm.prepareRecoveryAuthentication(activity, "synthetic recovery code")
+        runCurrent()
+        verify(exactly = 0) { auth.setAuthenticated(true) }
+        coVerify(exactly = 0) { database.completeRecovery(any(), any()) }
+        success.captured(result())
+        runCurrent()
+        coVerifyOrder {
+            database.completeRecovery(attempt, cipher)
+            auth.setAuthenticated(true)
+        }
+        verify { attempt.clear() }
+    }
+
+    @Test
+    fun cancellingRecoveryClearsPreparedKeyAndRejectsLateSuccess() = runTest {
+        val attempt = mockk<DatabaseManager.RecoveryAttempt>(relaxed = true)
+        every { attempt.cipher } returns cipher
+        coEvery { database.prepareRecovery(any()) } returns attempt
+        vm.prepareRecoveryAuthentication(activity, "synthetic recovery code")
+        runCurrent()
+        val late = success.captured
+        vm.cancelAuthentication()
+        late(result())
+        runCurrent()
+        verify { attempt.clear() }
+        coVerify(exactly = 0) { database.completeRecovery(any(), any()) }
+        verify(exactly = 0) { auth.setAuthenticated(true) }
     }
 
     @Test

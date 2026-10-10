@@ -38,6 +38,27 @@ class MainActivitySecurityTest {
     }
 
     @Test
+    fun regainingWindowFocusClearsExpiredSensitiveCopy() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val context = activity.applicationContext
+        com.example.compose_ui.components
+            .SensitiveClipboardCleaner(context, { 0L })
+            .copy("Password", "synthetic-secret")
+        context
+            .getSharedPreferences("clipboard_cleanup", android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putLong("deadline", 0L)
+            .commit()
+        activity.onWindowFocusChanged(true)
+        val board =
+            context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                as android.content.ClipboardManager
+        assertEquals("", board.primaryClip!!.getItemAt(0).text.toString())
+        controller.pause().stop().destroy()
+    }
+
+    @Test
     fun appStartsLocked() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         assertFalse(controller.get().authRepository.isAuthenticated.value)

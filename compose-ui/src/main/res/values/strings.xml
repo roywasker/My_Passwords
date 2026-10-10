@@ -1,0 +1,5 @@
+<resources>
+    <string name="credential_generate">צור סיסמה</string>
+    <string name="credential_show_password">הצג סיסמה</string>
+    <string name="credential_hide_password">הסתר סיסמה</string>
+</resources>

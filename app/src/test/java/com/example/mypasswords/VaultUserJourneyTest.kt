@@ -56,7 +56,6 @@ class VaultUserJourneyTest {
                 )
                 every { anyConstructed<DatabaseManager>().getPassphraseCipher() } returns cipher
                 coEvery { anyConstructed<DatabaseManager>().initializeDatabase(any()) } just Runs
-                every { anyConstructed<DatabaseManager>().clearSession() } just Runs
                 every {
                     anyConstructed<BiometricAuthManager>()
                         .promptBiometricAuth(
@@ -155,7 +154,7 @@ class VaultUserJourneyTest {
         compose.onAllNodes(hasSetTextAction())[0].performTextInput(platform)
         compose.onAllNodes(hasSetTextAction())[1].performTextInput(user)
         compose.onAllNodes(hasSetTextAction())[2].performTextInput(password)
-        compose.onNodeWithText(text(R.string.save_now_btn)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.save_now_btn)).assertIsDisplayed().performClick()
         compose.onNodeWithText(text(R.string.password_screen_title)).assertExists()
     }
 
@@ -223,7 +222,7 @@ class VaultUserJourneyTest {
         compose.onAllNodes(hasSetTextAction())[0].performTextInput("Retry service")
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("retry-user")
         compose.onAllNodes(hasSetTextAction())[2].performTextInput("retry-pass")
-        compose.onNodeWithText(text(R.string.save_now_btn)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.save_now_btn)).assertIsDisplayed().performClick()
         compose.onNodeWithText(text(R.string.error_database_access)).assertExists()
         compose.onNodeWithText(text(R.string.add_password_title)).assertExists()
         compose.runOnIdle { assertTrue(records.isEmpty()) }
@@ -243,7 +242,7 @@ class VaultUserJourneyTest {
                 c.clear()
                 publish()
             }
-        compose.onNodeWithText(text(R.string.save_now_btn)).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.save_now_btn)).assertIsDisplayed().performClick()
         compose.onNodeWithText(text(R.string.password_screen_title)).assertExists()
         compose.onNodeWithText("Retry service").assertExists()
     }

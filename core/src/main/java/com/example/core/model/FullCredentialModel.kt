@@ -6,7 +6,9 @@ data class FullCredentialModel(
     val username: CharArray,
     val password: CharArray,
     val website: String = "",
-    val categoryId: Int = 1
+    val categoryId: Int = 1,
+    val tags: List<String> = emptyList(),
+    val isFavorite: Boolean = false,
 ) {
     fun clear() {
         username.fill(' ')
@@ -25,6 +27,7 @@ data class FullCredentialModel(
         if (!password.contentEquals(other.password)) return false
         if (website != other.website) return false
         if (categoryId != other.categoryId) return false
+        if (tags != other.tags || isFavorite != other.isFavorite) return false
 
         return true
     }
@@ -36,6 +39,8 @@ data class FullCredentialModel(
         result = 31 * result + password.contentHashCode()
         result = 31 * result + website.hashCode()
         result = 31 * result + categoryId
+        result = 31 * result + tags.hashCode()
+        result = 31 * result + isFavorite.hashCode()
         return result
     }
 }

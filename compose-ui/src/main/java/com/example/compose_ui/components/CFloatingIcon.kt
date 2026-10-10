@@ -29,21 +29,23 @@ fun CFloatingIcon(
     shape: Shape = CircleShape,
     size: Dp = 40.dp,
     iconTint: Color,
+    contentDescription: String? = null,
 ) {
     Box(
-        modifier = modifier
-            .border(width = borderWidth, color = borderColor, shape = shape)
-            .size(size)
-            .clip(shape)
-            .background(iconBackGroundColor)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
+        modifier =
+            modifier
+                .border(width = borderWidth, color = borderColor, shape = shape)
+                .size(size)
+                .clip(shape)
+                .background(iconBackGroundColor)
+                .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = icon,
-            contentDescription = null,
+            contentDescription = contentDescription,
             tint = iconTint,
-            modifier = Modifier.size(iconSize)
+            modifier = Modifier.size(iconSize),
         )
     }
 }

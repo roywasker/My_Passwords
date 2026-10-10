@@ -23,6 +23,8 @@ sealed class AuthState {
 
     object Success : AuthState()
 
+    object ScanNotRecognized : AuthState()
+
     data class Error(val error: VaultError, val isFatal: Boolean = false) : AuthState()
 }
 
@@ -38,9 +40,16 @@ constructor(
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
+    private var requestId = 0L
+    private var authenticationJob: kotlinx.coroutines.Job? = null
+    private var recovery: DatabaseManager.RecoveryAttempt? = null
 
     fun prepareAuthentication(activity: FragmentActivity) {
-        viewModelScope.launch {
+        cancelAuthentication()
+        _authState.value = AuthState.Idle
+        val request = requestId
+        val session = authRepository.sessionGeneration
+        authenticationJob = viewModelScope.launch {
             try {
                 val cipher = databaseManager.getPassphraseCipher()
                 val cryptoObject = BiometricPrompt.CryptoObject(cipher)
@@ -51,9 +60,14 @@ constructor(
                     subtitle = application.getString(R.string.login_subtitle),
                     negativeButtonText = application.getString(R.string.negative_button_text),
                     cryptoObject = cryptoObject,
-                    onSuccess = { result -> onAuthenticationSucceeded(result) },
-                    onError = { error -> onAuthenticationError(error) },
-                    onFailed = { onAuthenticationFailed() },
+                    onSuccess = { result ->
+                        if (isCurrent(request, session))
+                            onAuthenticationSucceeded(result, request, session)
+                    },
+                    onError = { error ->
+                        if (isCurrent(request, session)) onAuthenticationError(error)
+                    },
+                    onFailed = { if (isCurrent(request, session)) onAuthenticationFailed() },
                 )
             } catch (e: KeyPermanentlyInvalidatedException) {
                 _authState.value =
@@ -73,22 +87,36 @@ constructor(
         }
     }
 
-    private fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+    private fun isCurrent(request: Long, session: Long) =
+        request == requestId && session == authRepository.sessionGeneration
+
+    private fun onAuthenticationSucceeded(
+        result: BiometricPrompt.AuthenticationResult,
+        request: Long,
+        session: Long,
+    ) {
         val cipher = result.cryptoObject?.cipher
         if (cipher != null) {
-            viewModelScope.launch {
+            val attempt = recovery
+            authenticationJob = viewModelScope.launch {
                 try {
-                    databaseManager.initializeDatabase(cipher)
+                    if (attempt == null) databaseManager.initializeDatabase(cipher)
+                    else databaseManager.completeRecovery(attempt, cipher)
+                    if (!isCurrent(request, session)) return@launch
                     authRepository.setAuthenticated(true)
                     _authState.value = AuthState.Success
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    if (!isCurrent(request, session)) return@launch
                     val error = if (e is VaultError) e else VaultError.DatabaseError(e)
                     _authState.value =
                         if (isKeyInvalidated(e))
                             AuthState.Error(VaultError.KeyInvalidated, isFatal = true)
                         else AuthState.Error(error)
+                } finally {
+                    attempt?.clear()
+                    if (recovery === attempt) recovery = null
                 }
             }
         } else {
@@ -102,7 +130,68 @@ constructor(
     }
 
     private fun onAuthenticationFailed() {
-        _authState.value = AuthState.Error(VaultError.BiometricAuthFailed)
+        _authState.value = AuthState.ScanNotRecognized
+    }
+
+    fun prepareRecoveryAuthentication(activity: FragmentActivity, code: String) {
+        cancelAuthentication()
+        _authState.value = AuthState.Idle
+        val request = requestId
+        val session = authRepository.sessionGeneration
+        authenticationJob = viewModelScope.launch {
+            try {
+                val attempt = databaseManager.prepareRecovery(code)
+                if (!isCurrent(request, session)) {
+                    attempt.clear()
+                    return@launch
+                }
+                recovery = attempt
+                biometricAuthManager.promptBiometricAuth(
+                    activity,
+                    application.getString(R.string.login_title),
+                    application.getString(R.string.recovery_auth_subtitle),
+                    application.getString(R.string.negative_button_text),
+                    BiometricPrompt.CryptoObject(attempt.cipher),
+                    {
+                        if (isCurrent(request, session))
+                            onAuthenticationSucceeded(it, request, session)
+                    },
+                    {
+                        if (isCurrent(request, session)) {
+                            recovery?.clear()
+                            recovery = null
+                            onAuthenticationError(it)
+                        }
+                    },
+                    { if (isCurrent(request, session)) onAuthenticationFailed() },
+                )
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                if (isCurrent(request, session))
+                    _authState.value =
+                        AuthState.Error(
+                            VaultError.GenericError(
+                                messageOverride =
+                                    application.getString(R.string.error_recovery_failed)
+                            ),
+                            isFatal = true,
+                        )
+            }
+        }
+    }
+
+    fun cancelAuthentication() {
+        requestId++
+        authenticationJob?.cancel()
+        authenticationJob = null
+        recovery?.clear()
+        recovery = null
+        biometricAuthManager.cancelAuthentication()
+    }
+
+    override fun onCleared() {
+        cancelAuthentication()
     }
 
     private fun isKeyInvalidated(error: Throwable): Boolean {

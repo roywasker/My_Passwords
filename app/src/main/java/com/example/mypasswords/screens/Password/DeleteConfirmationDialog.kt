@@ -6,10 +6,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material3.Button
@@ -48,41 +52,48 @@ import com.example.mypasswords.ui.theme.TitleTextColor
 fun DeleteConfirmationDialog(
     platformName: String,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    val landscape = com.example.compose_ui.components.isVaultLandscape()
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties =
+            androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = !landscape),
+    ) {
         Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
+            modifier =
+                (if (landscape) Modifier.widthIn(max = 600.dp) else Modifier)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            shape = RoundedCornerShape(32.dp),
             color = BackgroundColor,
-            border = androidx.compose.foundation.BorderStroke(1.dp, RectangleIconBorderColor)
+            border = androidx.compose.foundation.BorderStroke(1.dp, RectangleIconBorderColor),
         ) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 Column(
-                    modifier = Modifier
-                        .padding(24.dp)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    modifier =
+                        Modifier.verticalScroll(rememberScrollState())
+                            .padding(if (landscape) 16.dp else 24.dp)
+                            .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     // Trash Icon
                     Box(
-                        modifier = Modifier
-                            .size(60.dp)
-                            .clip(CircleShape)
-                            .background(DeleteButtonBackgroundColor),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier.size(if (landscape) 40.dp else 64.dp)
+                                .clip(CircleShape)
+                                .background(DeleteButtonBackgroundColor),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = null,
                             tint = DeleteButtonColor,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(30.dp),
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(if (landscape) 8.dp else 24.dp))
 
                     // Title
                     CText(
@@ -90,7 +101,7 @@ fun DeleteConfirmationDialog(
                         color = TitleTextColor,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -101,7 +112,10 @@ fun DeleteConfirmationDialog(
                     val descriptionText = buildAnnotatedString {
                         withStyle(style = ParagraphStyle(textDirection = TextDirection.Rtl)) {
                             if (parts.isNotEmpty()) append(parts[0])
-                            withStyle(style = SpanStyle(color = TitleTextColor, fontWeight = FontWeight.Bold)) {
+                            withStyle(
+                                style =
+                                    SpanStyle(color = TitleTextColor, fontWeight = FontWeight.Bold)
+                            ) {
                                 append(platformName)
                             }
                             if (parts.size > 1) append(parts[1])
@@ -114,51 +128,55 @@ fun DeleteConfirmationDialog(
                         fontSize = 16.sp,
                         lineHeight = 24.sp,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(if (landscape) 12.dp else 32.dp))
 
-                    // Delete Button
-                    Button(
-                        onClick = onConfirm,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = DeleteButtonColor
-                        )
-                    ) {
-                        CText(
-                            text = stringResource(id = R.string.delete_dialog_confirm),
-                            color = TitleTextColor,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Cancel Button
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = RectangleBackGroundColor
-                        ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, RectangleIconBorderColor)
-                    ) {
-                        CText(
-                            text = stringResource(id = R.string.delete_dialog_cancel),
-                            color = TitleTextColor,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    com.example.compose_ui.components.VaultFieldPair(
+                        12.dp,
+                        first = {
+                            // Delete Button
+                            Button(
+                                onClick = onConfirm,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                                shape = RoundedCornerShape(20.dp),
+                                colors =
+                                    ButtonDefaults.buttonColors(containerColor = DeleteButtonColor),
+                            ) {
+                                CText(
+                                    text = stringResource(id = R.string.delete_dialog_confirm),
+                                    color = DeleteButtonBackgroundColor,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        },
+                        second = {
+                            // Cancel Button
+                            Button(
+                                onClick = onDismiss,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                                shape = RoundedCornerShape(20.dp),
+                                colors =
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = RectangleBackGroundColor
+                                    ),
+                                border =
+                                    androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        RectangleIconBorderColor,
+                                    ),
+                            ) {
+                                CText(
+                                    text = stringResource(id = R.string.delete_dialog_cancel),
+                                    color = TitleTextColor,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        },
+                    )
                 }
             }
         }

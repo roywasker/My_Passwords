@@ -25,6 +25,7 @@ class PasswordRepositoryTest {
 
     @Before
     fun setup() {
+        every { manager.session } returns com.example.core.auth.VaultSession()
         every { manager.isInitialized } returns initialized
         every { manager.isDatabaseInitialized() } answers { initialized.value }
         every { manager.getSessionVaultKey() } returns key
@@ -33,6 +34,8 @@ class PasswordRepositoryTest {
         every { dao.getAllCredentials() } returns rows
         coEvery { dao.insertCredential(any()) } just Runs
         coEvery { dao.deleteCredential(any()) } just Runs
+        coEvery { dao.moveToTrash(any(), any()) } returns 1
+        coEvery { dao.archiveAndUpdate(any(), any(), any(), any()) } just Runs
         coEvery { dao.getCredentialById(any()) } returns null
         coEvery { crypto.encryptWithKey(any(), key) } answers
             {
@@ -66,6 +69,86 @@ class PasswordRepositoryTest {
             2,
         )
 
+    @Test
+    fun unchangedUsernamesAreNotDecryptedWhenOtherRecordsOrMetadataChange() =
+        runBlocking<Unit> {
+            rows.value = listOf(entity())
+            assertEquals("user", repo.passwords.first().single().userName)
+            rows.value = listOf(entity().copy(platformName = "Renamed", categoryId = 3))
+            assertEquals("Renamed", repo.passwords.first().single().platform)
+            rows.value = listOf(entity().copy(encryptedPassword = "changed-password"), entity(9))
+            assertEquals(2, repo.passwords.first().size)
+            coVerify(exactly = 2) { crypto.decryptWithKey("encrypted-user", "user-iv", key) }
+        }
+
+    @Test
+    fun changedUsernameCiphertextInvalidatesOnlyItsOwnCacheEntry() =
+        runBlocking<Unit> {
+            rows.value = listOf(entity(8), entity(9))
+            repo.passwords.first()
+            coEvery { crypto.decryptWithKey("changed-user", "new-iv", key) } returns
+                "new-user".toByteArray()
+            rows.value =
+                listOf(
+                    entity(8).copy(encryptedUsername = "changed-user", usernameIv = "new-iv"),
+                    entity(9),
+                )
+            assertEquals(listOf("new-user", "user"), repo.passwords.first().map { it.userName })
+            coVerify(exactly = 2) { crypto.decryptWithKey("encrypted-user", "user-iv", key) }
+            coVerify(exactly = 1) { crypto.decryptWithKey("changed-user", "new-iv", key) }
+        }
+
+    @Test
+    fun deletingAndReaddingRecordDoesNotReuseRemovedUsername() =
+        runBlocking<Unit> {
+            rows.value = listOf(entity())
+            repo.passwords.first()
+            rows.value = emptyList()
+            assertTrue(repo.passwords.first().isEmpty())
+            rows.value = listOf(entity())
+            repo.passwords.first()
+            coVerify(exactly = 2) { crypto.decryptWithKey("encrypted-user", "user-iv", key) }
+        }
+
+    @Test
+    fun sessionLockWipesCacheBuffersAndNextSessionDecryptsAgain() =
+        runBlocking<Unit> {
+            rows.value = listOf(entity())
+            repo.passwords.first()
+            val cache =
+                PasswordRepository::class
+                    .java
+                    .getDeclaredField("usernameCache")
+                    .apply { isAccessible = true }
+                    .get(repo) as Map<*, *>
+            val entry = cache.values.single()!!
+            val held =
+                entry.javaClass
+                    .getDeclaredField("characters")
+                    .apply { isAccessible = true }
+                    .get(entry) as CharArray
+            manager.session.lock()
+            assertTrue(held.all { it == '\u0000' })
+            assertTrue(cache.isEmpty())
+            repo.passwords.first()
+            coVerify(exactly = 2) { crypto.decryptWithKey("encrypted-user", "user-iv", key) }
+        }
+
+    @Test
+    fun lockDuringDecryptionRejectsAndWipesLatePlaintextInsteadOfCachingIt() =
+        runBlocking<Unit> {
+            rows.value = listOf(entity())
+            val plaintext = "user".toByteArray()
+            coEvery { crypto.decryptWithKey("encrypted-user", "user-iv", key) } coAnswers
+                {
+                    initialized.value = false
+                    manager.session.lock()
+                    plaintext
+                }
+            assertTrue(withTimeout(3000) { repo.passwords.first() }.isEmpty())
+            assertTrue(plaintext.all { it == 0.toByte() })
+        }
+
     private suspend fun failure(block: suspend () -> Unit): Throwable =
         try {
             block()
@@ -80,12 +163,56 @@ class PasswordRepositoryTest {
     }
 
     @Test
+    fun healthAnalysisWipesDecryptedPasswordsAndItsOwnedKeyCopy() =
+        runBlocking<Unit> {
+            coEvery { dao.activeSnapshot() } returns listOf(entity())
+            val secret = "short".toByteArray()
+            var held: ByteArray? = null
+            coEvery { crypto.decryptWithKey("encrypted-pass", "pass-iv", any()) } answers
+                {
+                    held = thirdArg()
+                    secret
+                }
+            val report = repo.healthReport()
+            assertEquals(1, report.weakCount)
+            assertTrue(secret.all { it == 0.toByte() })
+            assertTrue(held!!.all { it == 0.toByte() })
+            assertTrue(key.all { it == 7.toByte() })
+        }
+
+    @Test
+    fun failedHealthAnalysisWipesEarlierSecretsAndDoesNotReturnCleanReport() =
+        runBlocking<Unit> {
+            coEvery { dao.activeSnapshot() } returns
+                listOf(entity(), entity(9).copy(encryptedPassword = "corrupt"))
+            val secret = "short".toByteArray()
+            coEvery { crypto.decryptWithKey("encrypted-pass", "pass-iv", any()) } returns secret
+            coEvery { crypto.decryptWithKey("corrupt", "pass-iv", any()) } throws
+                VaultError.DecryptionError(IllegalStateException())
+            assertTrue(failure { repo.healthReport() } is VaultError.DecryptionError)
+            assertTrue(secret.all { it == 0.toByte() })
+        }
+
+    @Test
+    fun lockedVaultCannotAnalyzeHealthReadHistoryOrModifyMetadata() =
+        runBlocking<Unit> {
+            initialized.value = false
+            assertSame(VaultError.UninitializedVault, failure { repo.healthReport() })
+            assertSame(VaultError.UninitializedVault, failure { repo.history(8) })
+            assertSame(VaultError.UninitializedVault, failure { repo.setFavorite(8, true) })
+            assertSame(VaultError.UninitializedVault, failure { repo.setTags(8, "work") })
+            assertSame(VaultError.UninitializedVault, failure { repo.trashItems() })
+            coVerify(exactly = 0) { dao.activeSnapshot() }
+        }
+
+    @Test
     fun addEncryptsBothFieldsAndPreservesMetadata() = runBlocking {
         val slot = slot<EncryptedCredentialEntity>()
         coEvery { dao.insertCredential(capture(slot)) } just Runs
         val c = credential()
         repo.addPassword(c)
-        assertEquals(entity(0), slot.captured)
+        assertEquals(entity(0), slot.captured.copy(createdAt = 0, passwordChangedAt = 0))
+        assertTrue(slot.captured.createdAt > 0 && slot.captured.passwordChangedAt > 0)
         assertTrue(c.username.all { it == 0.toByte() })
         assertTrue(c.password.all { it == 0.toByte() })
         coVerify(exactly = 2) { crypto.encryptWithKey(any(), key) }
@@ -139,9 +266,10 @@ class PasswordRepositoryTest {
     }
 
     @Test
-    fun updateKeepsIdAndEncryptsNewFields() = runBlocking {
+    fun updateKeepsIdAndReusesUnchangedCiphertext() = runBlocking {
         val slot = slot<EncryptedCredentialEntity>()
-        coEvery { dao.insertCredential(capture(slot)) } just Runs
+        coEvery { dao.getCredentialById(77) } returns entity(77)
+        coEvery { dao.archiveAndUpdate(any(), capture(slot), any(), any()) } just Runs
         val c = credential()
         repo.updatePassword(77, c)
         assertEquals(entity(77), slot.captured)
@@ -151,7 +279,8 @@ class PasswordRepositoryTest {
     @Test
     fun updateFailureClearsInputAndKeepsOriginalCause() = runBlocking {
         val e = Exception("write")
-        coEvery { dao.insertCredential(any()) } throws e
+        coEvery { dao.getCredentialById(9) } returns entity(9)
+        coEvery { dao.archiveAndUpdate(any(), any(), any(), any()) } throws e
         val c = credential()
         assertSame(e, (failure { repo.updatePassword(9, c) } as VaultError.DatabaseError).cause)
         assertTrue(c.password.all { it == 0.toByte() })
@@ -166,14 +295,14 @@ class PasswordRepositoryTest {
     @Test
     fun deletePassesRequestedId() = runBlocking {
         repo.deletePassword(77)
-        coVerify(exactly = 1) { dao.deleteCredential(77) }
+        coVerify(exactly = 1) { dao.moveToTrash(77, any()) }
         coVerify(exactly = 0) { crypto.encryptWithKey(any(), any()) }
     }
 
     @Test
     fun deleteWrapsUnknownError() = runBlocking {
         val e = Exception()
-        coEvery { dao.deleteCredential(any()) } throws e
+        coEvery { dao.moveToTrash(any(), any()) } throws e
         assertSame(e, (failure { repo.deletePassword(1) } as VaultError.DatabaseError).cause)
     }
 
@@ -323,8 +452,16 @@ class PasswordRepositoryTest {
     @Test
     fun updateCancellationPropagatesAndWipesInput() =
         runBlocking<Unit> {
-            coEvery { dao.insertCredential(any()) } throws CancellationException()
-            val c = credential()
+            coEvery { dao.getCredentialById(any()) } answers { entity(firstArg()) }
+
+            coEvery { dao.archiveAndUpdate(any(), any(), any(), any()) } throws
+                CancellationException()
+            val c =
+                credential()
+                    .copy(
+                        username = "changed-user".toByteArray(),
+                        password = "changed-password".toByteArray(),
+                    )
             try {
                 repo.updatePassword(8, c)
                 fail()
@@ -336,7 +473,7 @@ class PasswordRepositoryTest {
     @Test
     fun deleteCancellationRemainsCancellationRatherThanDatabaseError() =
         runBlocking<Unit> {
-            coEvery { dao.deleteCredential(any()) } throws CancellationException()
+            coEvery { dao.moveToTrash(any(), any()) } throws CancellationException()
             try {
                 repo.deletePassword(8)
                 fail()

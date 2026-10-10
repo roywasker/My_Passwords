@@ -10,6 +10,7 @@ data class Credential(
     val password: ByteArray,
     val website: String = "",
     val categoryId: Int = 1,
+    val tags: List<String> = emptyList(),
 ) {
     fun clear() {
         username.fill(0)
@@ -27,6 +28,7 @@ data class Credential(
         if (!password.contentEquals(other.password)) return false
         if (website != other.website) return false
         if (categoryId != other.categoryId) return false
+        if (tags != other.tags) return false
 
         return true
     }
@@ -37,6 +39,7 @@ data class Credential(
         result = 31 * result + password.contentHashCode()
         result = 31 * result + website.hashCode()
         result = 31 * result + categoryId
+        result = 31 * result + tags.hashCode()
         return result
     }
 }

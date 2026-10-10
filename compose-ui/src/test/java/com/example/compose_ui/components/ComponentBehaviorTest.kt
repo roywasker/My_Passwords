@@ -33,6 +33,96 @@ class ComponentBehaviorTest {
     }
 
     @Test
+    fun sharedCredentialFieldPreservesExactUnicodeAndWhitespace() {
+        var received = ""
+        compose.setContent {
+            var value by remember { mutableStateOf("") }
+            CCredentialTextField(
+                value = value,
+                onValueChange = {
+                    received = it
+                    value = it
+                },
+            )
+        }
+        compose.onNode(hasSetTextAction()).performTextReplacement("  שלום 日本語  ")
+        compose.runOnIdle { assertEquals("  שלום 日本語  ", received) }
+    }
+
+    @Test
+    fun sharedPasswordFieldRevealsOnlyOnRequestWhileKeepingSensitiveInputType() {
+        compose.setContent {
+            CCredentialTextField(value = "synthetic-secret", onValueChange = {}, isPassword = true)
+        }
+        compose
+            .onNode(hasSetTextAction())
+            .assert(
+                SemanticsMatcher.keyIsDefined(
+                    androidx.compose.ui.semantics.SemanticsProperties.Password
+                )
+            )
+        val show =
+            RuntimeEnvironment.getApplication()
+                .getString(com.example.compose_ui.R.string.credential_show_password)
+        compose.onNodeWithContentDescription(show).performClick()
+        compose.onNode(hasSetTextAction()).performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { action ->
+            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            assertTrue(action(layouts))
+            assertEquals("synthetic-secret", layouts.single().layoutInput.text.text)
+        }
+        compose
+            .onNode(hasSetTextAction())
+            .assert(
+                SemanticsMatcher.keyIsDefined(
+                    androidx.compose.ui.semantics.SemanticsProperties.Password
+                )
+            )
+    }
+
+    @Test
+    fun busySharedPasswordFieldCannotGenerateAReplacement() {
+        compose.setContent {
+            CCredentialTextField(
+                value = "secret",
+                onValueChange = { fail("Busy form cannot change") },
+                isPassword = true,
+                enabled = false,
+                onGeneratePassword = { fail("Busy form cannot generate") },
+            )
+        }
+        val generate =
+            RuntimeEnvironment.getApplication()
+                .getString(com.example.compose_ui.R.string.credential_generate)
+        compose.onNodeWithContentDescription(generate).assertIsNotEnabled().performClick()
+    }
+
+    @Test
+    fun changingEditedRecordResetsUnsavedFieldsEvenForIdenticalPlatformNames() {
+        var id by mutableStateOf(1)
+        var submitted: Pair<String, String>? = null
+        compose.setContent {
+            CEditPasswordSheet(
+                "Same site",
+                "user-$id",
+                "secret-$id",
+                "",
+                {},
+                { u, p -> submitted = u to p },
+                title = "Edit",
+                usernameLabel = "Username",
+                passwordLabel = "Password",
+                updateButtonText = "Update",
+                recordKey = id,
+            )
+        }
+        compose.onAllNodes(hasSetTextAction())[0].performTextReplacement("unsaved user")
+        compose.runOnIdle { id = 2 }
+        compose.onNodeWithText("user-2").assertExists()
+        compose.onNodeWithText("Update").performClick()
+        compose.runOnIdle { assertEquals("user-2" to "secret-2", submitted) }
+    }
+
+    @Test
     fun disabledButtonDoesNotInvokeCallback() {
         var clicks = 0
         compose.setContent { CButton("Save", { clicks++ }, enabled = false) }
@@ -243,13 +333,13 @@ class ComponentBehaviorTest {
     }
 
     @Test
-    fun editCurrentlyAllowsEmptyFields() {
+    fun emptyEditedFieldsDisableUpdate() {
         var saved: Pair<String, String>? = null
         showEdit({ u, p -> saved = u to p })
         compose.onAllNodes(hasSetTextAction())[0].performTextClearance()
         compose.onAllNodes(hasSetTextAction())[1].performTextClearance()
-        compose.onNodeWithText("Update").performClick()
-        compose.runOnIdle { assertEquals("" to "", saved) }
+        compose.onNodeWithText("Update").assertIsNotEnabled().performClick()
+        compose.runOnIdle { assertNull(saved) }
     }
 
     @Test

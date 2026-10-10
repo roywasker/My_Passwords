@@ -5,7 +5,12 @@ data class PasswordItemModel(
     val platform: String,
     val userName: String,
     val website: String = "",
-    val categoryId: Int = 1
+    val categoryId: Int = 1,
+    val tags: List<String> = emptyList(),
+    val isFavorite: Boolean = false,
+    val createdAt: Long = 0,
+    val passwordChangedAt: Long = 0,
+    val deletedAt: Long? = null,
 ) {
     val letter: String
         get() = platform.trim().firstOrNull()?.uppercase() ?: ""
